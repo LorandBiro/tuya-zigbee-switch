@@ -5,6 +5,7 @@ const {
     onOff,
     text,
     binary,
+    windowCovering,
 } = require("zigbee-herdsman-converters/lib/modernExtend");
 const {assertString} = require("zigbee-herdsman-converters/lib/utils");
 const reporting = require("zigbee-herdsman-converters/lib/reporting");
@@ -173,6 +174,17 @@ const romasku = {
                         if (!["u", "U", "d", "f"].includes(part[3])) {
                             throw new Error(`Pull up down ${part[3]} is invalid. Valid options are u, U, d, f`);
                         } 
+                    } else if (part[0] == 'X') {
+                        // Cover input: X{up}{down}{pull}
+                        validatePin(part.slice(1,3));
+                        validatePin(part.slice(3,5));
+                        if (!["u", "U", "d", "f"].includes(part[5])) {
+                            throw new Error(`Pull up down ${part[5]} is invalid. Valid options are u, U, d, f`);
+                        }
+                    } else if (part[0] == 'W') {
+                        // Cover output: W{up}{down}
+                        validatePin(part.slice(1,3));
+                        validatePin(part.slice(3,5));
                     } else if (part[0] == 'L' || part[0] == 'R' || part[0] == 'I') {
                         validatePin(part.slice(1,3));
                     } else if(part[0] == 'M') {
@@ -180,15 +192,154 @@ const romasku = {
                     } else if(part[0] == 'i') {
                         ; // TODO: write validation
                     } else {
-                        throw new Error(`Invalid entry ${part}. Should start with one of B, R, L, S, I`);
+                        throw new Error(`Invalid entry ${part}. Should start with one of B, R, L, S, I, X, W`);
                     }
                 }
             }
+        }),
+    // Cover-specific definitions
+        coverInputAction: (name, endpointName) =>
+        enumLookup({
+            name,
+            endpointName,
+            access: "STATE_GET",
+            lookup: { 
+                released: 0, 
+                up_press: 1, 
+                down_press: 2,
+                stop_press: 3,
+                up_long_press: 4,
+                down_long_press: 5 
+            },
+            cluster: "genMultistateInput",
+            attribute: "presentValue",
+            description: "Cover input button press action",
+        }),
+        coverOutputState: (name, endpointName) =>
+        enumLookup({
+            name,
+            endpointName,
+            access: "STATE_GET",
+            lookup: {
+                stopped: 0,
+                opening: 1,
+                closing: 2
+            },
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff06, type: 0x30 }, // Enum8
+            description: "Cover motor operational state",
+        }),
+    coverOutputReversal: (name, endpointName) =>
+        binary({
+            name,
+            endpointName,
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff07, type: 0x10 }, // Boolean
+            description: "Reverse motor direction (swap UP/DOWN relays)",
+        }),
+    coverInputOutputIndex: (name, endpointName, output_cnt) =>
+        enumLookup({
+            name,
+            endpointName,
+            lookup: Object.fromEntries(
+                Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_output_${i + 1}`, i + 1])
+            ),
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff00, type: 0x20 }, // uint8
+                description: "Which cover output to control locally",
+        }),
+        coverInputReversal: (name, endpointName) =>
+        binary({
+            name,
+            endpointName,
+            valueOn: ["ON", 1],
+            valueOff: ["OFF", 0],
+            cluster: "closuresWindowCovering",
+            attribute: {ID: 0xff01, type: 0x10},  // Boolean
+            description: "Reverse UP/DOWN direction for inputs",
+            access: "ALL",
+        }),
+        coverInputLocalMode: (name, endpointName) =>
+        enumLookup({
+            name,
+            endpointName,
+            lookup: { detached: 0, press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff02, type: 0x30 }, // Enum8
+            description: "When to trigger local cover output",
+        }),
+        coverInputBindedMode: (name, endpointName) =>
+        enumLookup({
+            name,
+            endpointName,
+            lookup: { press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff03, type: 0x30 }, // Enum8
+            description: "When to send commands to bound devices",
+        }),
+        coverInputLongPressDuration: (name, endpointName) =>
+        numeric({
+            name,
+            endpointNames: [endpointName],
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff04, type: 0x21 }, // uint16
+            description: "Long press duration in milliseconds",
+            valueMin: 0,
+            valueMax: 5000,
         }),
 };
 
 const definitions = [
 {% for device in devices %}
+{% if device.device_type == "cover" %}
+    // Cover device
+    {
+        zigbeeModel: [
+        {% for zb_model in device.zb_models %}
+            "{{zb_model}}",
+        {% endfor %}
+        ],
+        model: "{{device.model}}",
+        vendor: "Tuya-custom",
+                description: "Custom cover controller (https://github.com/romasku/tuya-zigbee-switch)",
+        extend: [
+            deviceEndpoints({ endpoints: {
+                {%- for inputName in device.coverInputNames -%}
+                    "{{inputName}}": {{loop.index}},{{" "}}
+                {%- endfor -%}
+                {%- for outputName in device.coverOutputNames -%}
+                    "{{outputName}}": {{loop.index + (device.coverInputNames | length)}},{{" "}}
+                {%- endfor -%}
+            } }),
+            romasku.deviceConfig("device_config", "{{device.coverInputNames[0]}}"),
+            {% if device.has_dedicated_net_led %}
+            romasku.networkIndicator("network_led", "{{device.coverInputNames[0]}}"),
+            {% endif %}
+            
+            // Cover output
+            {% for outputName in device.coverOutputNames %}
+            windowCovering({ 
+                controls: ["lift"],
+                endpointNames: ["{{outputName}}"]
+            }),
+            romasku.coverOutputState("{{outputName}}_state", "{{outputName}}"),
+            romasku.coverOutputReversal("{{outputName}}_reversal", "{{outputName}}"),
+            {% endfor %}
+            
+            // Cover input
+            {% for inputName in device.coverInputNames %}
+            romasku.coverInputAction("{{inputName}}_action", "{{inputName}}"),
+            romasku.coverInputOutputIndex("{{inputName}}_output_index", "{{inputName}}", {{device.coverOutputNames | length}}),
+            romasku.coverInputReversal("{{inputName}}_reversal", "{{inputName}}"),
+            romasku.coverInputLocalMode("{{inputName}}_local_mode", "{{inputName}}"),
+            romasku.coverInputBindedMode("{{inputName}}_binded_mode", "{{inputName}}"),
+            romasku.coverInputLongPressDuration("{{inputName}}_long_press_duration", "{{inputName}}"),
+            {% endfor %}
+        ],
+{% else %}
+    // Switch/relay device
     {
         zigbeeModel: [
         {% for zb_model in device.zb_models %}
@@ -227,8 +378,44 @@ const definitions = [
             romasku.relayIndicator("{{relayName}}_indicator", "{{relayName}}"),
             {% endfor %}
         ],
+{% endif %}
         meta: { multiEndpoint: true },
         configure: async (device, coordinatorEndpoint, logger) => {
+{% if device.device_type == "cover" %}
+            // Cover input endpoints - button state reporting
+            {% for inputName in device.coverInputNames %}
+            const input{{loop.index}} = device.getEndpoint({{loop.index}});
+            await reporting.bind(input{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
+            await input{{loop.index}}.configureReporting("genMultistateInput", [
+                {
+                    attribute: {ID: 0x0055, type: 0x21}, // presentValue, uint16
+                    minimumReportInterval: 0,
+                    maximumReportInterval: constants.repInterval.MAX,
+                    reportableChange: 1,
+                },
+            ]);
+            {% endfor %}
+            // Cover output endpoints - motor state and position reporting
+            {% for outputName in device.coverOutputNames %}
+            const output{{loop.index}} = device.getEndpoint({{loop.index + (device.coverInputNames | length)}});
+            await reporting.bind(output{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
+            await output{{loop.index}}.configureReporting("closuresWindowCovering", [
+                {
+                    attribute: "currentPositionLiftPercentage",
+                    minimumReportInterval: 0,
+                    maximumReportInterval: constants.repInterval.MAX,
+                    reportableChange: 1,
+                },
+                {
+                    attribute: {ID: 0xff06, type: 0x30}, // operational_status, enum8
+                    minimumReportInterval: 0,
+                    maximumReportInterval: constants.repInterval.MAX,
+                    reportableChange: 1,
+                },
+            ]);
+            {% endfor %}
+{% else %}
+            // Switch endpoints
             {% for switchName in device.switchNames %}
             const endpoint{{loop.index}} = device.getEndpoint({{loop.index}});
             await reporting.bind(endpoint{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
@@ -242,6 +429,7 @@ const definitions = [
                 },
             ]);
             {% endfor %}
+            // Relay endpoints
             {% for relayName in device.relayNames %}
             const endpoint{{loop.index  + (device.switchNames | length)}} = device.getEndpoint({{loop.index  + (device.switchNames | length)}});
             await reporting.onOff(endpoint{{loop.index  + (device.switchNames | length)}}, {
@@ -250,7 +438,7 @@ const definitions = [
                 change: 1,
             });
             {% endfor %}
-
+            // Relay indicator LEDs
             {% for relayName in device.relayIndicatorNames %}
             await endpoint{{loop.index  + (device.switchNames | length)}}.configureReporting("genOnOff", [
                 {
@@ -261,6 +449,7 @@ const definitions = [
                 },
             ]);
             {% endfor %}
+{% endif %}
         },
         {% if z2m_v1 %}
         ota: ota.zigbeeOTA,

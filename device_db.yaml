@@ -2811,8 +2811,8 @@ ZBMINIL2:
   store:
   - https://sonoff.tech/products/sonoff-zbmini-extreme-zigbee-smart-switch-zbminil2
 GIRIER_TS130F_DUAL:
-  human_name: Girier TS130F Dual
-  category: module
+  human_name: Girier TS130F Dual Curtain Controller
+  category: cover
   power: mains
   neutral: required
   device_type: router
@@ -2824,7 +2824,7 @@ GIRIER_TS130F_DUAL:
   tuya_module: ZTU
   mcu_family: Telink
   mcu: TLSR8258
-  config_str: j1xl73iw;TS130F-GIR-DUAL;LC1;SB4u;RC0;SD2u;RC4;SC3u;RD4;SC2u;RD7;
+  config_str: j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;
   alt_config_str: null
   old_manufacturer_names: null
   old_zb_models: null
@@ -2833,6 +2833,6 @@ GIRIER_TS130F_DUAL:
   firmware_image_type: 45597
   build: yes
   status: in_progress
-  info: The on-board button is wired to the same pin as the first switch, so you can't reset the device by pressing the button. You have to press the switch 10 times.
+  info: Basic cover support - UP/DOWN/STOP only. The on-board button shares pin with first switch.
   threads: https://github.com/romasku/tuya-zigbee-switch/issues/270
   store: https://www.aliexpress.com/item/1005003864471089.html

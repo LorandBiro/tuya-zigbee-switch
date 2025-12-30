@@ -3,6 +3,8 @@
 
 #define MAX_RELAYS 5
 #define MAX_SWITCHES 5
+#define MAX_COVER_INPUTS 4
+#define MAX_COVER_OUTPUTS 4
 
 #define NV_ITEM_CURRENT_VERSION_IN_NV 1
 #define NV_ITEM_DEVICE_CONFIG 2
@@ -17,5 +19,15 @@
 // 3 + 5 (relays) + 5 (switches) = 13
 // Adding room for future items, so starting from 32
 #define NV_ITEM_DEVICE_TYPE 32
+
+// Cover cluster NVM items (starting from 40)
+#define NVM_COVER_INPUT_0_CONFIG 40
+#define NVM_COVER_INPUT_1_CONFIG 41
+#define NVM_COVER_INPUT_2_CONFIG 42
+#define NVM_COVER_INPUT_3_CONFIG 43
+#define NVM_COVER_OUTPUT_0_CONFIG 44
+#define NVM_COVER_OUTPUT_1_CONFIG 45
+#define NVM_COVER_OUTPUT_2_CONFIG 46
+#define NVM_COVER_OUTPUT_3_CONFIG 47
 
 #endif /* DEVICE_CONFIG_NVM_ITEMS_H_ */

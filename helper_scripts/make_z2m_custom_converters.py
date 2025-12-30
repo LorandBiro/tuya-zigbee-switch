@@ -41,6 +41,8 @@ if __name__ == "__main__":
 
         relay_cnt = 0
         switch_cnt = 0
+        cover_input_cnt = 0
+        cover_output_cnt = 0
         indicators_cnt = 0
         has_dedicated_net_led = False
         for peripheral in peripherals:
@@ -50,37 +52,70 @@ if __name__ == "__main__":
                 relay_cnt += 1
             if peripheral[0] == 'S':
                 switch_cnt += 1
+            if peripheral[0] == 'X':
+                cover_input_cnt += 1
+            if peripheral[0] == 'W':
+                cover_output_cnt += 1
             if peripheral[0] == 'I':
                 indicators_cnt += 1
             if peripheral[0] == 'L':
                 has_dedicated_net_led = True
         
-        if switch_cnt == 1:
-            switch_names = ["switch"]
-        elif switch_cnt == 2:
-            switch_names = ["switch_left", "switch_right"]
-        elif switch_cnt == 3:
-            switch_names = ["switch_left", "switch_middle", "switch_right"]
+        is_cover_device = cover_input_cnt > 0 or cover_output_cnt > 0
+        
+        if is_cover_device:
+            # Cover device
+            if cover_input_cnt == 1:
+                cover_input_names = ["cover_input"]
+            elif cover_input_cnt == 2:
+                cover_input_names = ["cover_input_left", "cover_input_right"]
+            else:
+                cover_input_names = [f"cover_input_{i+1}" for i in range(cover_input_cnt)]
+            
+            if cover_output_cnt == 1:
+                cover_output_names = ["cover_output"]
+            elif cover_output_cnt == 2:
+                cover_output_names = ["cover_output_left", "cover_output_right"]
+            else:
+                cover_output_names = [f"cover_output_{i+1}" for i in range(cover_output_cnt)]
+            
+            devices.append({
+                "zb_models": [zb_model] + (device.get("old_zb_models") or []),
+                "model": device.get("override_z2m_device") or device["stock_converter_model"],
+                "device_type": "cover",
+                "coverInputNames": cover_input_names,
+                "coverOutputNames": cover_output_names,
+                "has_dedicated_net_led": has_dedicated_net_led,
+            })
         else:
-            switch_names = [f"switch_{index}" for index in range(relay_cnt)]
+            # Regular switch/relay device
+            if switch_cnt == 1:
+                switch_names = ["switch"]
+            elif switch_cnt == 2:
+                switch_names = ["switch_left", "switch_right"]
+            elif switch_cnt == 3:
+                switch_names = ["switch_left", "switch_middle", "switch_right"]
+            else:
+                switch_names = [f"switch_{index}" for index in range(switch_cnt)]
 
-        if relay_cnt == 1:
-            relay_names = ["relay"]
-        elif relay_cnt == 2:
-            relay_names = ["relay_left", "relay_right"]
-        elif relay_cnt == 3:
-            relay_names = ["relay_left", "relay_middle", "relay_right"]
-        else:
-            relay_names = [f"relay_{index}" for index in range(relay_cnt)]
+            if relay_cnt == 1:
+                relay_names = ["relay"]
+            elif relay_cnt == 2:
+                relay_names = ["relay_left", "relay_right"]
+            elif relay_cnt == 3:
+                relay_names = ["relay_left", "relay_middle", "relay_right"]
+            else:
+                relay_names = [f"relay_{index}" for index in range(relay_cnt)]
 
-        devices.append({
-            "zb_models": [zb_model] + (device.get("old_zb_models") or []),
-            "model": device.get("override_z2m_device") or device["stock_converter_model"],
-            "switchNames": switch_names,
-            "relayNames": relay_names,
-            "relayIndicatorNames": relay_names[:indicators_cnt],
-            "has_dedicated_net_led": has_dedicated_net_led,
-        })
+            devices.append({
+                "zb_models": [zb_model] + (device.get("old_zb_models") or []),
+                "model": device.get("override_z2m_device") or device["stock_converter_model"],
+                "device_type": "switch",
+                "switchNames": switch_names,
+                "relayNames": relay_names,
+                "relayIndicatorNames": relay_names[:indicators_cnt],
+                "has_dedicated_net_led": has_dedicated_net_led,
+            })
 
     template = env.get_template("switch_custom.js.jinja")
 

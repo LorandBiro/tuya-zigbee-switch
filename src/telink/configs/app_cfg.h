@@ -51,6 +51,7 @@
 /* #define ZCL_IAS_ZONE_SUPPORT 1     */ /* IAS Zone cluster (disabled) */
 #define ZCL_POLL_CTRL_SUPPORT 0          /* Poll control cluster */
 #define ZCL_GROUP_SUPPORT 1              /* Groups cluster */
+#define ZCL_WINDOW_COVERING_SUPPORT 1    /* Window covering cluster */
 #define ZCL_OTA_SUPPORT 1                /* OTA upgrade cluster */
 
 /* Zigbee Features */

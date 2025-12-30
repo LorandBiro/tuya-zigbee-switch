@@ -63,7 +63,9 @@
 
 // Multistate cluster
 
+#define ZCL_ATTR_MULTISTATE_INPUT_DESCRIPTION         0x001C
 #define ZCL_ATTR_MULTISTATE_INPUT_NUMBER_OF_STATES    0x004A
+#define ZCL_ATTR_MULTISTATE_INPUT_NUM_OF_STATES       0x004A
 #define ZCL_ATTR_MULTISTATE_INPUT_OUT_OF_SERVICE      0x0051
 #define ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE       0x0055
 #define ZCL_ATTR_MULTISTATE_INPUT_STATUS_FLAGS        0x006F
@@ -72,6 +74,30 @@
 // Groups cluster
 
 #define ZCL_ATTR_GROUP_NAME_SUPPORT                     0x0000
+
+// WindowCovering cluster (Closures domain)
+
+#define ZCL_CLUSTER_WINDOW_COVERING                        0x0102
+
+// Standard WindowCovering attributes
+#define ZCL_ATTR_WINDOW_COVERING_TYPE                      0x0000
+#define ZCL_ATTR_WINDOW_COVERING_PHYSICAL_CLOSED_LIMIT_LIFT    0x0001
+#define ZCL_ATTR_WINDOW_COVERING_PHYSICAL_CLOSED_LIMIT_TILT    0x0002
+#define ZCL_ATTR_WINDOW_COVERING_CONFIG_STATUS             0x0007
+#define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE    0x0008
+#define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_TILT_PERCENTAGE    0x0009
+#define ZCL_ATTR_WINDOW_COVERING_MODE                      0x0017
+
+// Custom manufacturer-specific attributes (cover input - on WindowCovering CLIENT cluster)
+#define ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX        0xff00
+#define ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL            0xff01
+#define ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE          0xff02
+#define ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE         0xff03
+#define ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR      0xff04
+
+// Custom manufacturer-specific attributes (cover output - on WindowCovering SERVER cluster)
+#define ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS        0xff06
+#define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL            0xff07
 
 // OTA cluster
 
@@ -148,6 +174,27 @@
 #define ZCL_CMD_LEVEL_MOVE_WITH_ON_OFF                    0x05
 #define ZCL_CMD_LEVEL_STEP_WITH_ON_OFF                    0x06
 #define ZCL_CMD_LEVEL_STOP_WITH_ON_OFF                    0x07
+
+// WindowCovering Cluster
+
+#define ZCL_CMD_WINDOW_COVERING_UP_OPEN                    0x00
+#define ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE                 0x01
+#define ZCL_CMD_WINDOW_COVERING_STOP                       0x02
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_VALUE           0x04
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE      0x05
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_TILT_VALUE           0x07
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_TILT_PERCENTAGE      0x08
+
+// WindowCovering types
+#define ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE               0x08
+#define ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE_TWO_MOTORS    0x09
+#define ZCL_WINDOW_COVERING_TYPE_DRAPERY                   0x0A
+
+// WindowCovering Mode bitmap values
+#define ZCL_WINDOW_COVERING_MODE_MOTOR_REVERSED            0x01
+#define ZCL_WINDOW_COVERING_MODE_CALIBRATION               0x02
+#define ZCL_WINDOW_COVERING_MODE_MAINTENANCE               0x04
+#define ZCL_WINDOW_COVERING_MODE_LED_DISABLED              0x08
 
 // OTA Cluster
 
