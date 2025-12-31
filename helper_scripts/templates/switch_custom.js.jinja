@@ -371,22 +371,22 @@ const definitions = [
                 controls: ["lift"],
                 endpointNames: ["{{outputName}}"]
             }),
-            romasku.coverOutputState("{{outputName}}_state", "{{outputName}}"),
-            romasku.coverOutputReversal("{{outputName}}_reversal", "{{outputName}}"),
-            romasku.coverCalibration("{{outputName}}_calibration", "{{outputName}}"),
-            romasku.coverCalibrationTime("{{outputName}}_calibration_time", "{{outputName}}"),
-            romasku.coverOpenDelay("{{outputName}}_open_delay", "{{outputName}}"),
-            romasku.coverCloseDelay("{{outputName}}_close_delay", "{{outputName}}"),
+            romasku.coverOutputState("status", "{{outputName}}"),
+            romasku.coverOutputReversal("reversal", "{{outputName}}"),
+            romasku.coverCalibration("calibration", "{{outputName}}"),
+            romasku.coverCalibrationTime("calibration_time", "{{outputName}}"),
+            romasku.coverOpenDelay("open_delay", "{{outputName}}"),
+            romasku.coverCloseDelay("close_delay", "{{outputName}}"),
             {% endfor %}
             
             // Cover switch
             {% for inputName in device.coverInputNames %}
-            romasku.coverInputAction("{{inputName}}_action", "{{inputName}}"),
-            romasku.coverInputOutputIndex("{{inputName}}_output_index", "{{inputName}}", {{device.coverOutputNames | length}}),
-            romasku.coverInputReversal("{{inputName}}_reversal", "{{inputName}}"),
-            romasku.coverInputLocalMode("{{inputName}}_local_mode", "{{inputName}}"),
-            romasku.coverInputBindedMode("{{inputName}}_binded_mode", "{{inputName}}"),
-            romasku.coverInputLongPressDuration("{{inputName}}_long_press_duration", "{{inputName}}"),
+            romasku.coverInputAction("action", "{{inputName}}"),
+            romasku.coverInputOutputIndex("output_index", "{{inputName}}", {{device.coverOutputNames | length}}),
+            romasku.coverInputReversal("reversal", "{{inputName}}"),
+            romasku.coverInputLocalMode("local_mode", "{{inputName}}"),
+            romasku.coverInputBindedMode("binded_mode", "{{inputName}}"),
+            romasku.coverInputLongPressDuration("long_press_duration", "{{inputName}}"),
             {% endfor %}
         ],
 {% else %}
