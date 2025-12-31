@@ -128,11 +128,11 @@ def test_various_cover_configs_boot(cfg: str, num_cover_switches: int, num_cover
 
 
 def test_cover_responds_to_commands(device: Device):
-    """Test that cover responds to UP/DOWN/STOP commands."""
+    """Test that cover responds to OPEN/CLOSE/STOP commands."""
     # This test uses default device_config fixture which needs to be updated
     # For now, we'll skip unless device has cover endpoints
     try:
-        # Try to send UP command to hypothetical cover endpoint
+        # Try to send OPEN command to hypothetical cover endpoint
         device.call_zigbee_cmd(3, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
         # If no exception, command was accepted
     except AssertionError:
@@ -202,7 +202,7 @@ def cover_device(cover_device_config: str) -> Device:
 
 def test_cover_switch_button_press(cover_device: Device):
     """Test that pressing cover switch buttons updates multistate value."""
-    # Press UP button (A0)
+    # Press OPEN button (A0)
     cover_device.press_button("A0")
     cover_device.step_time(100)
     
@@ -219,7 +219,7 @@ def test_cover_switch_button_press(cover_device: Device):
 
 
 def test_cover_safety_interlock():
-    """Test that UP and DOWN relays cannot be activated simultaneously.
+    """Test that OPEN and CLOSE relays cannot be activated simultaneously.
     
     This is a CRITICAL safety test to prevent short circuits.
     """
@@ -228,27 +228,27 @@ def test_cover_safety_interlock():
     try:
         d = Device(p)
         
-        # Send UP command
+        # Send OPEN command
         d.call_zigbee_cmd(1, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
         d.step_time(10)
         
-        # Check GPIO state - UP relay (A0) should be ON
-        up_state = d.get_gpio("A0", refresh=True)
-        down_state = d.get_gpio("A1", refresh=True)
+        # Check GPIO state - OPEN relay (A0) should be ON
+        open_state = d.get_gpio("A0", refresh=True)
+        close_state = d.get_gpio("A1", refresh=True)
         
-        # During UP operation, DOWN should definitely be OFF
-        assert not down_state, "DOWN relay active during UP command - SAFETY VIOLATION!"
+        # During OPEN operation, CLOSE should definitely be OFF
+        assert not close_state, "CLOSE relay active during OPEN command - SAFETY VIOLATION!"
         
-        # Now send DOWN command (should stop UP first)
+        # Now send CLOSE command (should stop OPEN first)
         d.call_zigbee_cmd(1, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
         d.step_time(60)  # Wait for 50ms interlock + some margin
         
         # Check states again
-        up_state = d.get_gpio("A0", refresh=True)
-        down_state = d.get_gpio("A1", refresh=True)
+        open_state = d.get_gpio("A0", refresh=True)
+        close_state = d.get_gpio("A1", refresh=True)
         
-        # UP should be OFF now, DOWN should be ON
-        assert not up_state, "UP relay still active during DOWN command - SAFETY VIOLATION!"
+        # OPEN should be OFF now, CLOSE should be ON
+        assert not open_state, "OPEN relay still active during CLOSE command - SAFETY VIOLATION!"
         
     finally:
         p.stop()
@@ -261,7 +261,7 @@ def test_cover_stop_command():
     try:
         d = Device(p)
         
-        # Start UP movement
+        # Start OPEN movement
         d.call_zigbee_cmd(1, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
         d.step_time(10)
         
@@ -270,11 +270,11 @@ def test_cover_stop_command():
         d.step_time(10)
         
         # Both relays should be OFF
-        up_state = d.get_gpio("A0", refresh=True)
-        down_state = d.get_gpio("A1", refresh=True)
+        open_state = d.get_gpio("A0", refresh=True)
+        close_state = d.get_gpio("A1", refresh=True)
         
-        assert not up_state, "UP relay still active after STOP"
-        assert not down_state, "DOWN relay active after STOP"
+        assert not open_state, "OPEN relay still active after STOP"
+        assert not close_state, "CLOSE relay active after STOP"
         
         # Operational status should be STOPPED
         status = d.read_zigbee_attr(

@@ -175,14 +175,14 @@ const romasku = {
                             throw new Error(`Pull up down ${part[3]} is invalid. Valid options are u, U, d, f`);
                         } 
                     } else if (part[0] == 'X') {
-                        // Cover switch: X{up}{down}{pull}
+                        // Cover switch: X{open}{close}{pull}
                         validatePin(part.slice(1,3));
                         validatePin(part.slice(3,5));
                         if (!["u", "U", "d", "f"].includes(part[5])) {
                             throw new Error(`Pull up down ${part[5]} is invalid. Valid options are u, U, d, f`);
                         }
                     } else if (part[0] == 'W') {
-                        // Cover: W{up}{down}
+                        // Cover: W{open}{close}
                         validatePin(part.slice(1,3));
                         validatePin(part.slice(3,5));
                     } else if (part[0] == 'L' || part[0] == 'R' || part[0] == 'I') {

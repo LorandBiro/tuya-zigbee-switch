@@ -81,10 +81,10 @@ hal_zigbee_cmd_result_t cover_cluster_callback(
   
   switch (command_id) {
   case ZCL_CMD_WINDOW_COVERING_UP_OPEN:
-    cover_up(cluster);
+    cover_open(cluster);
     break;
   case ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE:
-    cover_down(cluster);
+    cover_close(cluster);
     break;
   case ZCL_CMD_WINDOW_COVERING_STOP:
     cover_stop(cluster);
@@ -101,19 +101,19 @@ hal_zigbee_cmd_result_t cover_cluster_callback(
   return HAL_ZIGBEE_CMD_PROCESSED;
 }
 
-void cover_up(zigbee_cover_cluster *cluster) {
+void cover_open(zigbee_cover_cluster *cluster) {
   uint8_t reversed = cluster->reversal;
-  relay_t *up = reversed ? cluster->down_relay : cluster->up_relay;
-  relay_t *down = reversed ? cluster->up_relay : cluster->down_relay;
+  relay_t *open = reversed ? cluster->close_relay : cluster->open_relay;
+  relay_t *close = reversed ? cluster->open_relay : cluster->close_relay;
   
-  printf("Cover UP (reversed=%d)\r\n", reversed);
+  printf("Cover OPEN (reversed=%d)\r\n", reversed);
   
   // SAFETY FIRST: Stop everything
-  relay_off(down);
-  relay_off(up);
+  relay_off(close);
+  relay_off(open);
   
-  // Now safe to activate up relay
-  relay_on(up);
+  // Now safe to activate open relay
+  relay_on(open);
   
   // Update status to OPENING (1)
   cluster->status = 1;
@@ -124,19 +124,19 @@ void cover_up(zigbee_cover_cluster *cluster) {
                          ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS, 0, 0, 0);
 }
 
-void cover_down(zigbee_cover_cluster *cluster) {
+void cover_close(zigbee_cover_cluster *cluster) {
   uint8_t reversed = cluster->reversal;
-  relay_t *up = reversed ? cluster->down_relay : cluster->up_relay;
-  relay_t *down = reversed ? cluster->up_relay : cluster->down_relay;
+  relay_t *open = reversed ? cluster->close_relay : cluster->open_relay;
+  relay_t *close = reversed ? cluster->open_relay : cluster->close_relay;
   
-  printf("Cover DOWN (reversed=%d)\r\n", reversed);
+  printf("Cover CLOSE (reversed=%d)\r\n", reversed);
   
   // SAFETY FIRST: Stop everything
-  relay_off(up);
-  relay_off(down);
+  relay_off(open);
+  relay_off(close);
   
-  // Now safe to activate down relay
-  relay_on(down);
+  // Now safe to activate close relay
+  relay_on(close);
   
   // Update status to CLOSING (2)
   cluster->status = 2;
@@ -151,8 +151,8 @@ void cover_stop(zigbee_cover_cluster *cluster) {
   printf("Cover STOP\r\n");
   
   // Stop both relays
-  relay_off(cluster->up_relay);
-  relay_off(cluster->down_relay);
+  relay_off(cluster->open_relay);
+  relay_off(cluster->close_relay);
   
   // Update status to STOPPED (0)
   cluster->status = 0;

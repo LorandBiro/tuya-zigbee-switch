@@ -189,26 +189,26 @@ void parse_config() {
       relays_cnt++;
       relay_clusters_cnt++;
     } else if (entry[0] == 'X') {
-      // Cover switch input pair: X{up_pin}{down_pin}{pull}
-      hal_gpio_pin_t up_pin = hal_gpio_parse_pin(entry + 1);
-      hal_gpio_pin_t down_pin = hal_gpio_parse_pin(entry + 3);
+      // Cover switch input pair: X{open_pin}{close_pin}{pull}
+      hal_gpio_pin_t open_pin = hal_gpio_parse_pin(entry + 1);
+      hal_gpio_pin_t close_pin = hal_gpio_parse_pin(entry + 3);
       hal_gpio_pull_t pull = hal_gpio_parse_pull(entry + 5);
       
-      hal_gpio_init(up_pin, 1, pull);
-      hal_gpio_init(down_pin, 1, pull);
+      hal_gpio_init(open_pin, 1, pull);
+      hal_gpio_init(close_pin, 1, pull);
 
-      buttons[buttons_cnt].pin = up_pin;
+      buttons[buttons_cnt].pin = open_pin;
       buttons[buttons_cnt].long_press_duration_ms = 400;
       buttons[buttons_cnt].multi_press_duration_ms = 800;
-      button_t *up_button = &buttons[buttons_cnt++];
+      button_t *open_button = &buttons[buttons_cnt++];
 
-      buttons[buttons_cnt].pin = down_pin;
+      buttons[buttons_cnt].pin = close_pin;
       buttons[buttons_cnt].long_press_duration_ms = 400;
       buttons[buttons_cnt].multi_press_duration_ms = 800;
-      button_t *down_button = &buttons[buttons_cnt++];
+      button_t *close_button = &buttons[buttons_cnt++];
 
-      cover_switch_clusters[cover_switch_clusters_cnt].up_button = up_button;
-      cover_switch_clusters[cover_switch_clusters_cnt].down_button = down_button;
+      cover_switch_clusters[cover_switch_clusters_cnt].open_button = open_button;
+      cover_switch_clusters[cover_switch_clusters_cnt].close_button = close_button;
       cover_switch_clusters[cover_switch_clusters_cnt].input_idx = cover_switch_clusters_cnt;
       cover_switch_clusters[cover_switch_clusters_cnt].output_index = cover_clusters_cnt + 1;  // Default to next output
       cover_switch_clusters[cover_switch_clusters_cnt].reversal = 0;
@@ -217,25 +217,25 @@ void parse_config() {
       cover_switch_clusters_cnt++;
       
     } else if (entry[0] == 'W') {
-      // Cover relay pair: W{up_pin}{down_pin}
-      hal_gpio_pin_t up_pin = hal_gpio_parse_pin(entry + 1);
-      hal_gpio_pin_t down_pin = hal_gpio_parse_pin(entry + 3);
+      // Cover relay pair: W{open_pin}{close_pin}
+      hal_gpio_pin_t open_pin = hal_gpio_parse_pin(entry + 1);
+      hal_gpio_pin_t close_pin = hal_gpio_parse_pin(entry + 3);
 
-      hal_gpio_init(up_pin, 0, HAL_GPIO_PULL_NONE);
-      hal_gpio_init(down_pin, 0, HAL_GPIO_PULL_NONE);
+      hal_gpio_init(open_pin, 0, HAL_GPIO_PULL_NONE);
+      hal_gpio_init(close_pin, 0, HAL_GPIO_PULL_NONE);
 
-      relays[relays_cnt].pin = up_pin;
+      relays[relays_cnt].pin = open_pin;
       relays[relays_cnt].on_high = 1;
       relays[relays_cnt].is_latching = 0;
-      relay_t *up_relay = &relays[relays_cnt++];
+      relay_t *open_relay = &relays[relays_cnt++];
 
-      relays[relays_cnt].pin = down_pin;
+      relays[relays_cnt].pin = close_pin;
       relays[relays_cnt].on_high = 1;
       relays[relays_cnt].is_latching = 0;
-      relay_t *down_relay = &relays[relays_cnt++];
+      relay_t *close_relay = &relays[relays_cnt++];
 
-      cover_clusters[cover_clusters_cnt].up_relay = up_relay;
-      cover_clusters[cover_clusters_cnt].down_relay = down_relay;
+      cover_clusters[cover_clusters_cnt].open_relay = open_relay;
+      cover_clusters[cover_clusters_cnt].close_relay = close_relay;
       cover_clusters[cover_clusters_cnt].output_idx = cover_clusters_cnt;
       cover_clusters[cover_clusters_cnt].reversal = 0;  // No reversal
       cover_clusters[cover_clusters_cnt].window_covering_type = ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE;

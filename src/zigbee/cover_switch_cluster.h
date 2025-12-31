@@ -7,11 +7,11 @@
 
 // Cover switch press actions (MultiStateInput values)
 #define COVER_SWITCH_RELEASED 0
-#define COVER_SWITCH_UP_PRESS 1
-#define COVER_SWITCH_DOWN_PRESS 2
+#define COVER_SWITCH_OPEN_PRESS 1
+#define COVER_SWITCH_CLOSE_PRESS 2
 #define COVER_SWITCH_STOP_PRESS 3
-#define COVER_SWITCH_UP_LONG_PRESS 4
-#define COVER_SWITCH_DOWN_LONG_PRESS 5
+#define COVER_SWITCH_OPEN_LONG_PRESS 4
+#define COVER_SWITCH_CLOSE_LONG_PRESS 5
 
 // Local mode options
 #define COVER_LOCAL_MODE_DETACHED 0
@@ -32,12 +32,12 @@ typedef struct {
   uint8_t endpoint;
   
   // Physical buttons
-  button_t *up_button;
-  button_t *down_button;
+  button_t *open_button;
+  button_t *close_button;
   
   // Configuration attributes
   uint8_t output_index;            // Which cover to control locally
-  uint8_t reversal;                // Swap UP/DOWN (0=normal, 1=reversed)
+  uint8_t reversal;                // Swap OPEN/CLOSE (0=normal, 1=reversed)
   uint8_t local_mode;              // Detached/press_start/short/long/both
   uint8_t binded_mode;             // When to send bind commands
   

@@ -21,12 +21,12 @@ extern uint8_t cover_clusters_cnt;
 extern uint8_t switch_clusters_cnt;
 extern uint8_t relay_clusters_cnt;
 
-void cover_switch_cluster_on_up_button_press(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_up_button_release(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_up_button_long_press(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_down_button_press(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_down_button_release(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_down_button_long_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_open_button_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_open_button_release(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_open_button_long_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_close_button_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_close_button_release(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster *cluster);
 
 zigbee_cover_switch_cluster *cover_switch_cluster_by_endpoint[10];
 
@@ -50,21 +50,21 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
   cluster->endpoint = endpoint->endpoint;
   cover_switch_cluster_load_attrs_from_nv(cluster);
 
-  cluster->up_button->on_press =
-      (ev_button_callback_t)cover_switch_cluster_on_up_button_press;
-  cluster->up_button->on_release =
-      (ev_button_callback_t)cover_switch_cluster_on_up_button_release;
-  cluster->up_button->on_long_press =
-      (ev_button_callback_t)cover_switch_cluster_on_up_button_long_press;
-  cluster->up_button->callback_param = cluster;
+  cluster->open_button->on_press =
+      (ev_button_callback_t)cover_switch_cluster_on_open_button_press;
+  cluster->open_button->on_release =
+      (ev_button_callback_t)cover_switch_cluster_on_open_button_release;
+  cluster->open_button->on_long_press =
+      (ev_button_callback_t)cover_switch_cluster_on_open_button_long_press;
+  cluster->open_button->callback_param = cluster;
 
-  cluster->down_button->on_press =
-      (ev_button_callback_t)cover_switch_cluster_on_down_button_press;
-  cluster->down_button->on_release =
-      (ev_button_callback_t)cover_switch_cluster_on_down_button_release;
-  cluster->down_button->on_long_press =
-      (ev_button_callback_t)cover_switch_cluster_on_down_button_long_press;
-  cluster->down_button->callback_param = cluster;
+  cluster->close_button->on_press =
+      (ev_button_callback_t)cover_switch_cluster_on_close_button_press;
+  cluster->close_button->on_release =
+      (ev_button_callback_t)cover_switch_cluster_on_close_button_release;
+  cluster->close_button->on_long_press =
+      (ev_button_callback_t)cover_switch_cluster_on_close_button_long_press;
+  cluster->close_button->callback_param = cluster;
 
   // WindowCovering client cluster FIRST (for binding and configuration)
   SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 0,
@@ -81,7 +81,7 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
                       ATTR_WRITABLE, cluster->binded_mode);
   SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 4,
                       ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR, ZCL_DATA_TYPE_UINT16,
-                      ATTR_WRITABLE, cluster->up_button->long_press_duration_ms);
+                      ATTR_WRITABLE, cluster->open_button->long_press_duration_ms);
 
   endpoint->clusters[endpoint->cluster_count].cluster_id = ZCL_CLUSTER_WINDOW_COVERING;
   endpoint->clusters[endpoint->cluster_count].attribute_count = 5;
@@ -131,10 +131,10 @@ void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t c
 
   switch (command) {
   case ZCL_CMD_WINDOW_COVERING_UP_OPEN:
-    cover_up(output);
+    cover_open(output);
     break;
   case ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE:
-    cover_down(output);
+    cover_close(output);
     break;
   case ZCL_CMD_WINDOW_COVERING_STOP:
     cover_stop(output);
@@ -142,8 +142,8 @@ void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t c
   }
 }
 
-void cover_switch_cluster_on_up_button_press(zigbee_cover_switch_cluster *cluster) {
-  uint8_t action = cluster->reversal ? COVER_SWITCH_DOWN_PRESS : COVER_SWITCH_UP_PRESS;
+void cover_switch_cluster_on_open_button_press(zigbee_cover_switch_cluster *cluster) {
+  uint8_t action = cluster->reversal ? COVER_SWITCH_CLOSE_PRESS : COVER_SWITCH_OPEN_PRESS;
   uint8_t command = cluster->reversal ? ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE : ZCL_CMD_WINDOW_COVERING_UP_OPEN;
 
   cluster->multistate_state = action;
@@ -158,7 +158,7 @@ void cover_switch_cluster_on_up_button_press(zigbee_cover_switch_cluster *cluste
   // TODO: Send bind command if configured
 }
 
-void cover_switch_cluster_on_up_button_release(zigbee_cover_switch_cluster *cluster) {
+void cover_switch_cluster_on_open_button_release(zigbee_cover_switch_cluster *cluster) {
   cluster->multistate_state = COVER_SWITCH_RELEASED;
   cover_switch_cluster_report_action(cluster);
 
@@ -168,8 +168,8 @@ void cover_switch_cluster_on_up_button_release(zigbee_cover_switch_cluster *clus
   }
 }
 
-void cover_switch_cluster_on_up_button_long_press(zigbee_cover_switch_cluster *cluster) {
-  uint8_t action = cluster->reversal ? COVER_SWITCH_DOWN_LONG_PRESS : COVER_SWITCH_UP_LONG_PRESS;
+void cover_switch_cluster_on_open_button_long_press(zigbee_cover_switch_cluster *cluster) {
+  uint8_t action = cluster->reversal ? COVER_SWITCH_CLOSE_LONG_PRESS : COVER_SWITCH_OPEN_LONG_PRESS;
   uint8_t command = cluster->reversal ? ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE : ZCL_CMD_WINDOW_COVERING_UP_OPEN;
 
   cluster->multistate_state = action;
@@ -184,8 +184,8 @@ void cover_switch_cluster_on_up_button_long_press(zigbee_cover_switch_cluster *c
   // TODO: Send bind command if configured
 }
 
-void cover_switch_cluster_on_down_button_press(zigbee_cover_switch_cluster *cluster) {
-  uint8_t action = cluster->reversal ? COVER_SWITCH_UP_PRESS : COVER_SWITCH_DOWN_PRESS;
+void cover_switch_cluster_on_close_button_press(zigbee_cover_switch_cluster *cluster) {
+  uint8_t action = cluster->reversal ? COVER_SWITCH_OPEN_PRESS : COVER_SWITCH_CLOSE_PRESS;
   uint8_t command = cluster->reversal ? ZCL_CMD_WINDOW_COVERING_UP_OPEN : ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
 
   cluster->multistate_state = action;
@@ -200,7 +200,7 @@ void cover_switch_cluster_on_down_button_press(zigbee_cover_switch_cluster *clus
   // TODO: Send bind command if configured
 }
 
-void cover_switch_cluster_on_down_button_release(zigbee_cover_switch_cluster *cluster) {
+void cover_switch_cluster_on_close_button_release(zigbee_cover_switch_cluster *cluster) {
   cluster->multistate_state = COVER_SWITCH_RELEASED;
   cover_switch_cluster_report_action(cluster);
 
@@ -210,8 +210,8 @@ void cover_switch_cluster_on_down_button_release(zigbee_cover_switch_cluster *cl
   }
 }
 
-void cover_switch_cluster_on_down_button_long_press(zigbee_cover_switch_cluster *cluster) {
-  uint8_t action = cluster->reversal ? COVER_SWITCH_UP_LONG_PRESS : COVER_SWITCH_DOWN_LONG_PRESS;
+void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster *cluster) {
+  uint8_t action = cluster->reversal ? COVER_SWITCH_OPEN_LONG_PRESS : COVER_SWITCH_CLOSE_LONG_PRESS;
   uint8_t command = cluster->reversal ? ZCL_CMD_WINDOW_COVERING_UP_OPEN : ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
 
   cluster->multistate_state = action;
@@ -253,9 +253,9 @@ void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
     cover_switch_cluster_store_attrs_to_nv(cluster);
     break;
   case ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR:
-    // Long press duration is shared between up and down buttons
-    cluster->down_button->long_press_duration_ms = 
-        cluster->up_button->long_press_duration_ms;
+    // Long press duration is shared between open and close buttons
+    cluster->close_button->long_press_duration_ms = 
+        cluster->open_button->long_press_duration_ms;
     cover_switch_cluster_store_attrs_to_nv(cluster);
     break;
   }

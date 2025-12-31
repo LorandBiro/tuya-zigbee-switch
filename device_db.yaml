@@ -2833,6 +2833,6 @@ GIRIER_TS130F_DUAL:
   firmware_image_type: 45597
   build: yes
   status: in_progress
-  info: Basic cover support - UP/DOWN/STOP only. The on-board button shares pin with first switch.
+  info: Basic cover support - OPEN/CLOSE/STOP only. The on-board button shares pin with first switch.
   threads: https://github.com/romasku/tuya-zigbee-switch/issues/270
   store: https://www.aliexpress.com/item/1005003864471089.html
