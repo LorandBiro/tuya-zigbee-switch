@@ -88,14 +88,14 @@
 #define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_TILT_PERCENTAGE    0x0009
 #define ZCL_ATTR_WINDOW_COVERING_MODE                      0x0017
 
-// Custom manufacturer-specific attributes (cover input - on WindowCovering CLIENT cluster)
+// Custom manufacturer-specific attributes (cover switch - on WindowCovering CLIENT cluster)
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX        0xff00
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL            0xff01
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE          0xff02
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE         0xff03
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR      0xff04
 
-// Custom manufacturer-specific attributes (cover output - on WindowCovering SERVER cluster)
+// Custom manufacturer-specific attributes (cover - on WindowCovering SERVER cluster)
 #define ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS        0xff06
 #define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL            0xff07
 

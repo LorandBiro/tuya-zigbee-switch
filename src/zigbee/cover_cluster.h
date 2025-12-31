@@ -1,5 +1,5 @@
-#ifndef _COVER_OUTPUT_CLUSTER_H_
-#define _COVER_OUTPUT_CLUSTER_H_
+#ifndef _COVER_CLUSTER_H_
+#define _COVER_CLUSTER_H_
 
 #include "base_components/relay.h"
 #include "hal/zigbee.h"
@@ -40,17 +40,17 @@ typedef struct {
   uint8_t position;              // 0-100 (0=closed, 100=open)
   
   hal_zigbee_attribute attr_infos[4];  // WindowCovering attributes
-} zigbee_cover_output_cluster;
+} zigbee_cover_cluster;
 
-void cover_output_cluster_add_to_endpoint(
-    zigbee_cover_output_cluster *cluster,
+void cover_cluster_add_to_endpoint(
+    zigbee_cover_cluster *cluster,
     hal_zigbee_endpoint *endpoint);
 
-void cover_output_up(zigbee_cover_output_cluster *cluster);
-void cover_output_down(zigbee_cover_output_cluster *cluster);
-void cover_output_stop(zigbee_cover_output_cluster *cluster);
+void cover_up(zigbee_cover_cluster *cluster);
+void cover_down(zigbee_cover_cluster *cluster);
+void cover_stop(zigbee_cover_cluster *cluster);
 
-void cover_output_cluster_callback_attr_write_trampoline(uint8_t endpoint,
+void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                          uint16_t attribute_id);
 
 #endif

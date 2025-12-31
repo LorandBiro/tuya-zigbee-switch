@@ -1,4 +1,4 @@
-#include "cover_output_cluster.h"
+#include "cover_cluster.h"
 #include "cluster_common.h"
 #include "consts.h"
 #include "device_config/nvm_items.h"
@@ -8,36 +8,36 @@
 #include "hal/zigbee.h"
 #include "base_components/relay.h"
 
-hal_zigbee_cmd_result_t cover_output_cluster_callback(
-    zigbee_cover_output_cluster *cluster,
+hal_zigbee_cmd_result_t cover_cluster_callback(
+    zigbee_cover_cluster *cluster,
     uint8_t command_id,
     void *cmd_payload);
-hal_zigbee_cmd_result_t cover_output_cluster_callback_trampoline(
+hal_zigbee_cmd_result_t cover_cluster_callback_trampoline(
     uint8_t endpoint,
     uint8_t cluster_id,
     uint8_t command_id,
     void *cmd_payload);
 
-void cover_output_cluster_on_write_attr(zigbee_cover_output_cluster *cluster,
+void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                           uint16_t attribute_id);
 
-void cover_output_cluster_store_attrs_to_nv(zigbee_cover_output_cluster *cluster);
-void cover_output_cluster_load_attrs_from_nv(zigbee_cover_output_cluster *cluster);
+void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster);
+void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster);
 
-zigbee_cover_output_cluster *cover_output_cluster_by_endpoint[10];
+zigbee_cover_cluster *cover_cluster_by_endpoint[10];
 
-void cover_output_cluster_callback_attr_write_trampoline(uint8_t endpoint,
+void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                            uint16_t attribute_id) {
-  cover_output_cluster_on_write_attr(cover_output_cluster_by_endpoint[endpoint],
+  cover_cluster_on_write_attr(cover_cluster_by_endpoint[endpoint],
                                        attribute_id);
 }
 
-void cover_output_cluster_add_to_endpoint(
-    zigbee_cover_output_cluster *cluster,
+void cover_cluster_add_to_endpoint(
+    zigbee_cover_cluster *cluster,
     hal_zigbee_endpoint *endpoint) {
-  cover_output_cluster_by_endpoint[endpoint->endpoint] = cluster;
+  cover_cluster_by_endpoint[endpoint->endpoint] = cluster;
   cluster->endpoint = endpoint->endpoint;
-  cover_output_cluster_load_attrs_from_nv(cluster);
+  cover_cluster_load_attrs_from_nv(cluster);
 
   // Initialize state
   cluster->status = 0;  // stopped
@@ -59,41 +59,41 @@ void cover_output_cluster_add_to_endpoint(
   endpoint->clusters[endpoint->cluster_count].attributes = cluster->attr_infos;
   endpoint->clusters[endpoint->cluster_count].is_server = 1;
   endpoint->clusters[endpoint->cluster_count].cmd_callback =
-      cover_output_cluster_callback_trampoline;
+      cover_cluster_callback_trampoline;
   endpoint->cluster_count++;
 }
 
-hal_zigbee_cmd_result_t cover_output_cluster_callback_trampoline(
+hal_zigbee_cmd_result_t cover_cluster_callback_trampoline(
     uint8_t endpoint,
     uint8_t cluster_id,
     uint8_t command_id,
     void *cmd_payload) {
-  return cover_output_cluster_callback(cover_output_cluster_by_endpoint[endpoint],
+  return cover_cluster_callback(cover_cluster_by_endpoint[endpoint],
                                          command_id, cmd_payload);
 }
 
-hal_zigbee_cmd_result_t cover_output_cluster_callback(
-    zigbee_cover_output_cluster *cluster,
+hal_zigbee_cmd_result_t cover_cluster_callback(
+    zigbee_cover_cluster *cluster,
     uint8_t command_id,
     void *cmd_payload) {
   
-  printf("Cover output command: %d\r\n", command_id);
+  printf("Cover command: %d\r\n", command_id);
   
   switch (command_id) {
   case ZCL_CMD_WINDOW_COVERING_UP_OPEN:
-    cover_output_up(cluster);
+    cover_up(cluster);
     break;
   case ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE:
-    cover_output_down(cluster);
+    cover_down(cluster);
     break;
   case ZCL_CMD_WINDOW_COVERING_STOP:
-    cover_output_stop(cluster);
+    cover_stop(cluster);
     break;
   case ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_VALUE:
   case ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE:
     // Not implemented in MVP - just stop
     printf("Go-to-position not implemented, stopping\r\n");
-    cover_output_stop(cluster);
+    cover_stop(cluster);
     break;
   default:
     return HAL_ZIGBEE_CMD_SKIPPED;
@@ -101,7 +101,7 @@ hal_zigbee_cmd_result_t cover_output_cluster_callback(
   return HAL_ZIGBEE_CMD_PROCESSED;
 }
 
-void cover_output_up(zigbee_cover_output_cluster *cluster) {
+void cover_up(zigbee_cover_cluster *cluster) {
   uint8_t reversed = cluster->reversal;
   relay_t *up = reversed ? cluster->down_relay : cluster->up_relay;
   relay_t *down = reversed ? cluster->up_relay : cluster->down_relay;
@@ -124,7 +124,7 @@ void cover_output_up(zigbee_cover_output_cluster *cluster) {
                          ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS, 0, 0, 0);
 }
 
-void cover_output_down(zigbee_cover_output_cluster *cluster) {
+void cover_down(zigbee_cover_cluster *cluster) {
   uint8_t reversed = cluster->reversal;
   relay_t *up = reversed ? cluster->down_relay : cluster->up_relay;
   relay_t *down = reversed ? cluster->up_relay : cluster->down_relay;
@@ -147,7 +147,7 @@ void cover_output_down(zigbee_cover_output_cluster *cluster) {
                          ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS, 0, 0, 0);
 }
 
-void cover_output_stop(zigbee_cover_output_cluster *cluster) {
+void cover_stop(zigbee_cover_cluster *cluster) {
   printf("Cover STOP\r\n");
   
   // Stop both relays
@@ -163,14 +163,14 @@ void cover_output_stop(zigbee_cover_output_cluster *cluster) {
                          ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS, 0, 0, 0);
 }
 
-void cover_output_cluster_store_attrs_to_nv(zigbee_cover_output_cluster *cluster) {
-  hal_nvm_write(NVM_COVER_OUTPUT_0_CONFIG + cluster->output_idx,
+void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
+  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx,
                 1, (uint8_t *)&cluster->reversal);
 }
 
-void cover_output_cluster_load_attrs_from_nv(zigbee_cover_output_cluster *cluster) {
+void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
   uint8_t read_status = hal_nvm_read(
-      NVM_COVER_OUTPUT_0_CONFIG + cluster->output_idx, 
+      NVM_COVER_0_CONFIG + cluster->output_idx, 
       1, (uint8_t *)&cluster->reversal);
   if (read_status != 0) {
     // Default values
@@ -178,11 +178,11 @@ void cover_output_cluster_load_attrs_from_nv(zigbee_cover_output_cluster *cluste
   }
 }
 
-void cover_output_cluster_on_write_attr(zigbee_cover_output_cluster *cluster,
+void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                           uint16_t attribute_id) {
   switch (attribute_id) {
   case ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL:
-    cover_output_cluster_store_attrs_to_nv(cluster);
+    cover_cluster_store_attrs_to_nv(cluster);
     break;
   }
 }

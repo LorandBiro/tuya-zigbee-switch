@@ -41,8 +41,8 @@ if __name__ == "__main__":
 
         relay_cnt = 0
         switch_cnt = 0
-        cover_input_cnt = 0
-        cover_output_cnt = 0
+        cover_switch_cnt = 0
+        cover_cnt = 0
         indicators_cnt = 0
         has_dedicated_net_led = False
         for peripheral in peripherals:
@@ -53,38 +53,38 @@ if __name__ == "__main__":
             if peripheral[0] == 'S':
                 switch_cnt += 1
             if peripheral[0] == 'X':
-                cover_input_cnt += 1
+                cover_switch_cnt += 1
             if peripheral[0] == 'W':
-                cover_output_cnt += 1
+                cover_cnt += 1
             if peripheral[0] == 'I':
                 indicators_cnt += 1
             if peripheral[0] == 'L':
                 has_dedicated_net_led = True
         
-        is_cover_device = cover_input_cnt > 0 or cover_output_cnt > 0
+        is_cover_device = cover_switch_cnt > 0 or cover_cnt > 0
         
         if is_cover_device:
             # Cover device
-            if cover_input_cnt == 1:
-                cover_input_names = ["cover_input"]
-            elif cover_input_cnt == 2:
-                cover_input_names = ["cover_input_left", "cover_input_right"]
+            if cover_switch_cnt == 1:
+                cover_switch_names = ["cover_switch"]
+            elif cover_switch_cnt == 2:
+                cover_switch_names = ["cover_switch_left", "cover_switch_right"]
             else:
-                cover_input_names = [f"cover_input_{i+1}" for i in range(cover_input_cnt)]
+                cover_switch_names = [f"cover_switch_{i+1}" for i in range(cover_switch_cnt)]
             
-            if cover_output_cnt == 1:
-                cover_output_names = ["cover_output"]
-            elif cover_output_cnt == 2:
-                cover_output_names = ["cover_output_left", "cover_output_right"]
+            if cover_cnt == 1:
+                cover_names = ["cover"]
+            elif cover_cnt == 2:
+                cover_names = ["cover_left", "cover_right"]
             else:
-                cover_output_names = [f"cover_output_{i+1}" for i in range(cover_output_cnt)]
+                cover_names = [f"cover_{i+1}" for i in range(cover_cnt)]
             
             devices.append({
                 "zb_models": [zb_model] + (device.get("old_zb_models") or []),
                 "model": device.get("override_z2m_device") or device["stock_converter_model"],
                 "device_type": "cover",
-                "coverInputNames": cover_input_names,
-                "coverOutputNames": cover_output_names,
+                "coverInputNames": cover_switch_names,
+                "coverOutputNames": cover_names,
                 "has_dedicated_net_led": has_dedicated_net_led,
             })
         else:

@@ -9,17 +9,17 @@ from zcl_consts import (
     ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
     ZCL_ATTR_WINDOW_COVERING_TYPE,
     ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS,
-    ZCL_ATTR_COVER_INPUT_OUTPUT_INDEX,
-    ZCL_ATTR_COVER_INPUT_REVERSAL,
+    ZCL_ATTR_COVER_SWITCH_OUTPUT_INDEX,
+    ZCL_ATTR_COVER_SWITCH_REVERSAL,
     ZCL_CLUSTER_BASIC,
     ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
     ZCL_CLUSTER_WINDOW_COVERING,
     ZCL_CMD_WINDOW_COVERING_UP_OPEN,
     ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE,
     ZCL_CMD_WINDOW_COVERING_STOP,
-    COVER_OUTPUT_STOPPED,
-    COVER_OUTPUT_OPENING,
-    COVER_OUTPUT_CLOSING,
+    COVER_STOPPED,
+    COVER_OPENING,
+    COVER_CLOSING,
 )
 
 
@@ -28,8 +28,8 @@ def test_girier_cover_device_boots():
     
     This is the CRITICAL safety test to prevent bricking the device.
     Config: j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;
-    - 2 cover input pairs (X entries): B4+D2, C3+C2
-    - 2 cover output pairs (W entries): C0+C4, D4+D7
+    - 2 cover switch pairs (X entries): B4+D2, C3+C2
+    - 2 cover pairs (W entries): C0+C4, D4+D7
     """
     cfg = "j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;"
     p = StubProc(device_config=cfg).start()
@@ -46,17 +46,17 @@ def test_girier_cover_endpoint_layout():
     """Test that GIRIER config creates correct endpoint layout.
 
     Expected layout:
-    - EP1: Cover Input 1 (WindowCovering client + MultiStateInput)
-    - EP2: Cover Input 2 (WindowCovering client + MultiStateInput)
-    - EP3: Cover Output 1 (WindowCovering server)
-    - EP4: Cover Output 2 (WindowCovering server)
+    - EP1: Cover switch 1 (WindowCovering client + MultiStateInput)
+    - EP2: Cover switch 2 (WindowCovering client + MultiStateInput)
+    - EP3: Cover 1 (WindowCovering server)
+    - EP4: Cover 2 (WindowCovering server)
     """
     cfg = "j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;"
     p = StubProc(device_config=cfg).start()
     try:
         d = Device(p)
         
-        # EP1 and EP2 should have MultiStateInput (cover inputs)
+        # EP1 and EP2 should have MultiStateInput (cover switches)
         for ep in [1, 2]:
             multistate = d.read_zigbee_attr(
                 ep,
@@ -65,15 +65,15 @@ def test_girier_cover_endpoint_layout():
             )
             assert multistate in ("0", "1", "2", "3", "4", "5"), f"EP{ep} missing MultiStateInput"
             
-            # Check custom cover input config attributes on WindowCovering client
+            # Check custom cover switch config attributes on WindowCovering client
             output_idx = d.read_zigbee_attr(
                 ep, 
                 ZCL_CLUSTER_WINDOW_COVERING,
-                ZCL_ATTR_COVER_INPUT_OUTPUT_INDEX
+                ZCL_ATTR_COVER_SWITCH_OUTPUT_INDEX
             )
             assert output_idx is not None, f"EP{ep} missing output_index attribute"
         
-        # EP3 and EP4 should have WindowCovering server (cover outputs)
+        # EP3 and EP4 should have WindowCovering server (covers)
         for ep in [3, 4]:
             # Check operational_status attribute
             status = d.read_zigbee_attr(
@@ -82,7 +82,7 @@ def test_girier_cover_endpoint_layout():
                 ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS
             )
             # Should be stopped (0) initially
-            assert int(status) == COVER_OUTPUT_STOPPED, \
+            assert int(status) == COVER_STOPPED, \
                 f"EP{ep} operational_status should be stopped initially"
             
             # Check window covering type attribute
@@ -106,7 +106,7 @@ def test_girier_cover_endpoint_layout():
 
 
 @pytest.mark.parametrize(
-    "cfg,num_cover_inputs,num_cover_outputs",
+    "cfg,num_cover_switches,num_covers",
     [
         # Single cover pair
         ("Mfr;Model;XA0A1u;WB0B1;", 1, 1),
@@ -116,7 +116,7 @@ def test_girier_cover_endpoint_layout():
         ("Mfr;Model;SA0u;RA1;XB0B1u;WC0C1;", 1, 1),  # switch/relay on EP1/2, cover on EP3/4
     ],
 )
-def test_various_cover_configs_boot(cfg: str, num_cover_inputs: int, num_cover_outputs: int):
+def test_various_cover_configs_boot(cfg: str, num_cover_switches: int, num_covers: int):
     """Test that various cover configurations boot without crashes."""
     p = StubProc(device_config=cfg).start()
     try:
@@ -127,8 +127,8 @@ def test_various_cover_configs_boot(cfg: str, num_cover_inputs: int, num_cover_o
         p.stop()
 
 
-def test_cover_output_responds_to_commands(device: Device):
-    """Test that cover output responds to UP/DOWN/STOP commands."""
+def test_cover_responds_to_commands(device: Device):
+    """Test that cover responds to UP/DOWN/STOP commands."""
     # This test uses default device_config fixture which needs to be updated
     # For now, we'll skip unless device has cover endpoints
     try:
@@ -146,8 +146,8 @@ def test_array_bounds_safety():
     This tests the safety limits:
     - buttons[5] array
     - relays[5] array
-    - cover_input_clusters[4] array
-    - cover_output_clusters[4] array
+    - cover_switch_clusters[4] array
+    - cover_clusters[4] array
     """
     # Maximum safe config: 2 cover pairs = 4 buttons + 4 relays
     # This should work (within limits)
@@ -200,8 +200,8 @@ def cover_device(cover_device_config: str) -> Device:
     proc.stop()
 
 
-def test_cover_input_button_press(cover_device: Device):
-    """Test that pressing cover input buttons updates multistate value."""
+def test_cover_switch_button_press(cover_device: Device):
+    """Test that pressing cover switch buttons updates multistate value."""
     # Press UP button (A0)
     cover_device.press_button("A0")
     cover_device.step_time(100)
@@ -282,7 +282,7 @@ def test_cover_stop_command():
             ZCL_CLUSTER_WINDOW_COVERING,
             ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS
         )
-        assert int(status) == COVER_OUTPUT_STOPPED
+        assert int(status) == COVER_STOPPED
         
     finally:
         p.stop()

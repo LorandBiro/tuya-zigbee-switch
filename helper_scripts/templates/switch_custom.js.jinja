@@ -175,14 +175,14 @@ const romasku = {
                             throw new Error(`Pull up down ${part[3]} is invalid. Valid options are u, U, d, f`);
                         } 
                     } else if (part[0] == 'X') {
-                        // Cover input: X{up}{down}{pull}
+                        // Cover switch: X{up}{down}{pull}
                         validatePin(part.slice(1,3));
                         validatePin(part.slice(3,5));
                         if (!["u", "U", "d", "f"].includes(part[5])) {
                             throw new Error(`Pull up down ${part[5]} is invalid. Valid options are u, U, d, f`);
                         }
                     } else if (part[0] == 'W') {
-                        // Cover output: W{up}{down}
+                        // Cover: W{up}{down}
                         validatePin(part.slice(1,3));
                         validatePin(part.slice(3,5));
                     } else if (part[0] == 'L' || part[0] == 'R' || part[0] == 'I') {
@@ -213,7 +213,7 @@ const romasku = {
             },
             cluster: "genMultistateInput",
             attribute: "presentValue",
-            description: "Cover input button press action",
+            description: "Cover switch button press action",
         }),
         coverOutputState: (name, endpointName) =>
         enumLookup({
@@ -244,11 +244,11 @@ const romasku = {
             name,
             endpointName,
             lookup: Object.fromEntries(
-                Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_output_${i + 1}`, i + 1])
+                Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_${i + 1}`, i + 1])
             ),
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff00, type: 0x20 }, // uint8
-                description: "Which cover output to control locally",
+                description: "Which cover to control locally",
         }),
         coverInputReversal: (name, endpointName) =>
         binary({
@@ -268,7 +268,7 @@ const romasku = {
             lookup: { detached: 0, press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff02, type: 0x30 }, // Enum8
-            description: "When to trigger local cover output",
+            description: "When to trigger local cover",
         }),
         coverInputBindedMode: (name, endpointName) =>
         enumLookup({
@@ -318,7 +318,7 @@ const definitions = [
             romasku.networkIndicator("network_led", "{{device.coverInputNames[0]}}"),
             {% endif %}
             
-            // Cover output
+            // Cover
             {% for outputName in device.coverOutputNames %}
             windowCovering({ 
                 controls: ["lift"],
@@ -328,7 +328,7 @@ const definitions = [
             romasku.coverOutputReversal("{{outputName}}_reversal", "{{outputName}}"),
             {% endfor %}
             
-            // Cover input
+            // Cover switch
             {% for inputName in device.coverInputNames %}
             romasku.coverInputAction("{{inputName}}_action", "{{inputName}}"),
             romasku.coverInputOutputIndex("{{inputName}}_output_index", "{{inputName}}", {{device.coverOutputNames | length}}),
@@ -382,7 +382,7 @@ const definitions = [
         meta: { multiEndpoint: true },
         configure: async (device, coordinatorEndpoint, logger) => {
 {% if device.device_type == "cover" %}
-            // Cover input endpoints - button state reporting
+            // Cover switch endpoints - button state reporting
             {% for inputName in device.coverInputNames %}
             const input{{loop.index}} = device.getEndpoint({{loop.index}});
             await reporting.bind(input{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
@@ -395,7 +395,7 @@ const definitions = [
                 },
             ]);
             {% endfor %}
-            // Cover output endpoints - motor state and position reporting
+            // Cover endpoints - motor state and position reporting
             {% for outputName in device.coverOutputNames %}
             const output{{loop.index}} = device.getEndpoint({{loop.index + (device.coverInputNames | length)}});
             await reporting.bind(output{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);

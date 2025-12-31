@@ -1,17 +1,17 @@
-#ifndef _COVER_INPUT_CLUSTER_H_
-#define _COVER_INPUT_CLUSTER_H_
+#ifndef _COVER_SWITCH_CLUSTER_H_
+#define _COVER_SWITCH_CLUSTER_H_
 
 #include "base_components/button.h"
 #include "hal/zigbee.h"
 #include <stdint.h>
 
-// Cover input press actions (MultiStateInput values)
-#define COVER_INPUT_RELEASED 0
-#define COVER_INPUT_UP_PRESS 1
-#define COVER_INPUT_DOWN_PRESS 2
-#define COVER_INPUT_STOP_PRESS 3
-#define COVER_INPUT_UP_LONG_PRESS 4
-#define COVER_INPUT_DOWN_LONG_PRESS 5
+// Cover switch press actions (MultiStateInput values)
+#define COVER_SWITCH_RELEASED 0
+#define COVER_SWITCH_UP_PRESS 1
+#define COVER_SWITCH_DOWN_PRESS 2
+#define COVER_SWITCH_STOP_PRESS 3
+#define COVER_SWITCH_UP_LONG_PRESS 4
+#define COVER_SWITCH_DOWN_LONG_PRESS 5
 
 // Local mode options
 #define COVER_LOCAL_MODE_DETACHED 0
@@ -36,7 +36,7 @@ typedef struct {
   button_t *down_button;
   
   // Configuration attributes
-  uint8_t output_index;            // Which cover output to control locally
+  uint8_t output_index;            // Which cover to control locally
   uint8_t reversal;                // Swap UP/DOWN (0=normal, 1=reversed)
   uint8_t local_mode;              // Detached/press_start/short/long/both
   uint8_t binded_mode;             // When to send bind commands
@@ -46,13 +46,13 @@ typedef struct {
   
   hal_zigbee_attribute multistate_attr_infos[4];      // MultiStateInput attributes (state reporting)
   hal_zigbee_attribute windowcovering_attr_infos[5];  // WindowCovering attributes (configuration)
-} zigbee_cover_input_cluster;
+} zigbee_cover_switch_cluster;
 
-void cover_input_cluster_add_to_endpoint(
-    zigbee_cover_input_cluster *cluster,
+void cover_switch_cluster_add_to_endpoint(
+    zigbee_cover_switch_cluster *cluster,
     hal_zigbee_endpoint *endpoint);
 
-void cover_input_cluster_callback_attr_write_trampoline(uint8_t endpoint,
+void cover_switch_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                         uint16_t attribute_id);
 
 #endif
