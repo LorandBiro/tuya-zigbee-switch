@@ -98,6 +98,10 @@
 // Custom manufacturer-specific attributes (cover - on WindowCovering SERVER cluster)
 #define ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS        0xff06
 #define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL            0xff07
+#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION               0xff08
+#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME          0xff09
+#define ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY                0xff0a
+#define ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY               0xff0b
 
 // OTA cluster
 

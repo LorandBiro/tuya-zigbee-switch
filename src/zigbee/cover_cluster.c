@@ -43,6 +43,12 @@ void cover_cluster_add_to_endpoint(
   cluster->status = 0;  // stopped
   cluster->window_covering_type = ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE;
   cluster->position = 50;  // Unknown position initially
+  
+  // Initialize calibration attributes with defaults
+  cluster->calibration = 0;        // Not calibrating
+  cluster->calibration_time = 0;   // Not calibrated yet
+  cluster->open_delay = 0;         // No delay
+  cluster->close_delay = 0;        // No delay
 
   // WindowCovering server cluster
   SETUP_ATTR(0, ZCL_ATTR_WINDOW_COVERING_TYPE, ZCL_DATA_TYPE_ENUM8,
@@ -53,9 +59,17 @@ void cover_cluster_add_to_endpoint(
              ATTR_WRITABLE, cluster->reversal);
   SETUP_ATTR(3, ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS, ZCL_DATA_TYPE_ENUM8,
              ATTR_READONLY, cluster->status);
+  SETUP_ATTR(4, ZCL_ATTR_WINDOW_COVERING_CALIBRATION, ZCL_DATA_TYPE_BOOLEAN,
+             ATTR_WRITABLE, cluster->calibration);
+  SETUP_ATTR(5, ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME, ZCL_DATA_TYPE_UINT16,
+             ATTR_WRITABLE, cluster->calibration_time);
+  SETUP_ATTR(6, ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY, ZCL_DATA_TYPE_UINT16,
+             ATTR_WRITABLE, cluster->open_delay);
+  SETUP_ATTR(7, ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY, ZCL_DATA_TYPE_UINT16,
+             ATTR_WRITABLE, cluster->close_delay);
 
   endpoint->clusters[endpoint->cluster_count].cluster_id = ZCL_CLUSTER_WINDOW_COVERING;
-  endpoint->clusters[endpoint->cluster_count].attribute_count = 4;
+  endpoint->clusters[endpoint->cluster_count].attribute_count = 8;
   endpoint->clusters[endpoint->cluster_count].attributes = cluster->attr_infos;
   endpoint->clusters[endpoint->cluster_count].is_server = 1;
   endpoint->clusters[endpoint->cluster_count].cmd_callback =
@@ -164,17 +178,34 @@ void cover_stop(zigbee_cover_cluster *cluster) {
 }
 
 void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
-  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx,
-                1, (uint8_t *)&cluster->reversal);
+  // Store reversal (1 byte) + calibration_time (2 bytes) + open_delay (2 bytes) + close_delay (2 bytes) = 7 bytes
+  uint8_t data[7];
+  data[0] = cluster->reversal;
+  data[1] = cluster->calibration_time & 0xFF;
+  data[2] = (cluster->calibration_time >> 8) & 0xFF;
+  data[3] = cluster->open_delay & 0xFF;
+  data[4] = (cluster->open_delay >> 8) & 0xFF;
+  data[5] = cluster->close_delay & 0xFF;
+  data[6] = (cluster->close_delay >> 8) & 0xFF;
+  
+  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx, 7, data);
 }
 
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
+  uint8_t data[7];
   uint8_t read_status = hal_nvm_read(
-      NVM_COVER_0_CONFIG + cluster->output_idx, 
-      1, (uint8_t *)&cluster->reversal);
+      NVM_COVER_0_CONFIG + cluster->output_idx, 7, data);
   if (read_status != 0) {
     // Default values
-    cluster->reversal = 0;  // No reversal
+    cluster->reversal = 0;           // No reversal
+    cluster->calibration_time = 0;   // Not calibrated
+    cluster->open_delay = 0;         // No delay
+    cluster->close_delay = 0;        // No delay
+  } else {
+    cluster->reversal = data[0];
+    cluster->calibration_time = data[1] | (data[2] << 8);
+    cluster->open_delay = data[3] | (data[4] << 8);
+    cluster->close_delay = data[5] | (data[6] << 8);
   }
 }
 
@@ -182,7 +213,14 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                           uint16_t attribute_id) {
   switch (attribute_id) {
   case ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL:
+  case ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME:
+  case ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY:
+  case ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY:
     cover_cluster_store_attrs_to_nv(cluster);
+    break;
+  case ZCL_ATTR_WINDOW_COVERING_CALIBRATION:
+    // Calibration attribute is not persisted - it's a command to start calibration
+    // TODO: Implement calibration logic
     break;
   }
 }

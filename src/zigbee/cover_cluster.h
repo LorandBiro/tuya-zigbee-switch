@@ -32,6 +32,12 @@ typedef struct {
   // Configuration
   uint8_t reversal;  // Motor reversal (0 = normal, 1 = reversed)
   
+  // Calibration attributes
+  uint8_t calibration;        // Start calibration mode (bool)
+  uint16_t calibration_time;  // Total travel time in seconds (0-65535)
+  uint16_t open_delay;        // Delay before opening starts (in 100ms units)
+  uint16_t close_delay;       // Delay before closing starts (in 100ms units)
+  
   // State reporting
   uint8_t status;  // Custom attribute: 0=stopped, 1=opening, 2=closing
   
@@ -39,7 +45,7 @@ typedef struct {
   uint8_t window_covering_type;  // 0x08 = Rollershade
   uint8_t position;              // 0-100 (0=closed, 100=open)
   
-  hal_zigbee_attribute attr_infos[4];  // WindowCovering attributes
+  hal_zigbee_attribute attr_infos[8];  // WindowCovering attributes
 } zigbee_cover_cluster;
 
 void cover_cluster_add_to_endpoint(

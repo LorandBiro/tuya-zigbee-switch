@@ -237,7 +237,54 @@ const romasku = {
             valueOff: [false, 0],
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff07, type: 0x10 }, // Boolean
-            description: "Reverse motor direction (swap UP/DOWN relays)",
+            description: "Reverse motor direction (swap OPEN/CLOSE relays)",
+        }),
+    coverCalibration: (name, endpointName) =>
+        binary({
+            name,
+            endpointName,
+            valueOn: [true, 1],
+            valueOff: [false, 0],
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff08, type: 0x10 }, // Boolean
+            description: "Start calibration mode",
+        }),
+    coverCalibrationTime: (name, endpointName) =>
+        numeric({
+            name,
+            endpointName,
+            valueMin: 0,
+            valueMax: 65535,
+            unit: "s",
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff09, type: 0x21 }, // uint16
+            description: "Total travel time between end positions",
+        }),
+    coverOpenDelay: (name, endpointName) =>
+        numeric({
+            name,
+            endpointName,
+            valueMin: 0,
+            valueMax: 65535,
+            valueStep: 1,
+            scale: 10,
+            unit: "ms",
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff0a, type: 0x21 }, // uint16
+            description: "Delay before opening starts from closed position (100ms units)",
+        }),
+    coverCloseDelay: (name, endpointName) =>
+        numeric({
+            name,
+            endpointName,
+            valueMin: 0,
+            valueMax: 65535,
+            valueStep: 1,
+            scale: 10,
+            unit: "ms",
+            cluster: "closuresWindowCovering",
+            attribute: { ID: 0xff0b, type: 0x21 }, // uint16
+            description: "Delay before closing starts from open position (100ms units)",
         }),
     coverInputOutputIndex: (name, endpointName, output_cnt) =>
         enumLookup({
@@ -326,6 +373,10 @@ const definitions = [
             }),
             romasku.coverOutputState("{{outputName}}_state", "{{outputName}}"),
             romasku.coverOutputReversal("{{outputName}}_reversal", "{{outputName}}"),
+            romasku.coverCalibration("{{outputName}}_calibration", "{{outputName}}"),
+            romasku.coverCalibrationTime("{{outputName}}_calibration_time", "{{outputName}}"),
+            romasku.coverOpenDelay("{{outputName}}_open_delay", "{{outputName}}"),
+            romasku.coverCloseDelay("{{outputName}}_close_delay", "{{outputName}}"),
             {% endfor %}
             
             // Cover switch
