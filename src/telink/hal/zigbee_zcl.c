@@ -53,7 +53,7 @@ static cluster_registerFunc_t get_register_func_by_cluster_id(u16 cluster_id) {
   return NULL;
 }
 
-static status_t cmd_callback(u8 endpoint, u8 clusterId, u8 cmdId,
+static status_t cmd_callback(u8 endpoint, u16 clusterId, u8 cmdId,
                              void *cmdPayload) {
   hal_zigbee_cluster *cluster = hal_zigbee_find_cluster(
       hal_endpoints, hal_endpoints_cnt, endpoint, clusterId);
