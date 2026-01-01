@@ -66,26 +66,37 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
       (ev_button_callback_t)cover_switch_cluster_on_close_button_long_press;
   cluster->close_button->callback_param = cluster;
 
-  // WindowCovering client cluster FIRST (for binding and configuration)
-  SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 0,
+  // Configuration attributes on OnOffSwitchConfig SERVER cluster
+  SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 0,
+                      ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_TYPE, ZCL_DATA_TYPE_ENUM8,
+                      ATTR_WRITABLE, cluster->switch_type);
+  SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 1,
                       ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX, ZCL_DATA_TYPE_UINT8,
                       ATTR_WRITABLE, cluster->output_index);
-  SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 1,
+  SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 2,
                       ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL, ZCL_DATA_TYPE_BOOLEAN,
                       ATTR_WRITABLE, cluster->reversal);
-  SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 2,
+  SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 3,
                       ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE, ZCL_DATA_TYPE_ENUM8,
                       ATTR_WRITABLE, cluster->local_mode);
-  SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 3,
+  SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 4,
                       ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE, ZCL_DATA_TYPE_ENUM8,
                       ATTR_WRITABLE, cluster->binded_mode);
-  SETUP_ATTR_FOR_TABLE(cluster->windowcovering_attr_infos, 4,
+  SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 5,
                       ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR, ZCL_DATA_TYPE_UINT16,
                       ATTR_WRITABLE, cluster->open_button->long_press_duration_ms);
 
+  // OnOffSwitchConfig SERVER cluster (for configuration)
+  endpoint->clusters[endpoint->cluster_count].cluster_id = ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG;
+  endpoint->clusters[endpoint->cluster_count].attribute_count = 6;
+  endpoint->clusters[endpoint->cluster_count].attributes = cluster->config_attr_infos;
+  endpoint->clusters[endpoint->cluster_count].is_server = 1;
+  endpoint->cluster_count++;
+
+  // WindowCovering CLIENT cluster (for binding to other devices)
   endpoint->clusters[endpoint->cluster_count].cluster_id = ZCL_CLUSTER_WINDOW_COVERING;
-  endpoint->clusters[endpoint->cluster_count].attribute_count = 5;
-  endpoint->clusters[endpoint->cluster_count].attributes = cluster->windowcovering_attr_infos;
+  endpoint->clusters[endpoint->cluster_count].attribute_count = 0;
+  endpoint->clusters[endpoint->cluster_count].attributes = NULL;
   endpoint->clusters[endpoint->cluster_count].is_server = 0;  // CLIENT
   endpoint->cluster_count++;
 
@@ -227,25 +238,41 @@ void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster
 }
 
 void cover_switch_cluster_store_attrs_to_nv(zigbee_cover_switch_cluster *cluster) {
-  hal_nvm_write(NVM_COVER_SWITCH_0_CONFIG + cluster->input_idx,
-                4, (uint8_t *)&cluster->output_index);
+  // Store: output_index (1) + reversal (1) + local_mode (1) + binded_mode (1) + switch_type (1) = 5 bytes
+  uint8_t data[5];
+  data[0] = cluster->output_index;
+  data[1] = cluster->reversal;
+  data[2] = cluster->local_mode;
+  data[3] = cluster->binded_mode;
+  data[4] = cluster->switch_type;
+  
+  hal_nvm_write(NVM_COVER_SWITCH_0_CONFIG + cluster->input_idx, 5, data);
 }
 
 void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluster) {
+  uint8_t data[5];
   uint8_t read_status = hal_nvm_read(
-      NVM_COVER_SWITCH_0_CONFIG + cluster->input_idx, 4, (uint8_t *)&cluster->output_index);
+      NVM_COVER_SWITCH_0_CONFIG + cluster->input_idx, 5, data);
   if (read_status != 0) {
     // Default values
     cluster->output_index = cluster->input_idx + 1;  // Default to same index + 1
     cluster->reversal = 0;
     cluster->local_mode = COVER_LOCAL_MODE_SHORT_AND_LONG_PRESS;
     cluster->binded_mode = COVER_BINDED_MODE_SHORT_AND_LONG_PRESS;
+    cluster->switch_type = 0x02;  // Multifunction (momentary)
+  } else {
+    cluster->output_index = data[0];
+    cluster->reversal = data[1];
+    cluster->local_mode = data[2];
+    cluster->binded_mode = data[3];
+    cluster->switch_type = data[4];
   }
 }
 
 void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
                                          uint16_t attribute_id) {
   switch (attribute_id) {
+  case ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_TYPE:
   case ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX:
   case ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL:
   case ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE:

@@ -195,10 +195,11 @@ const romasku = {
                         throw new Error(`Invalid entry ${part}. Should start with one of B, R, L, S, I, X, W`);
                     }
                 }
-            }
+            },
+            entity_category: "diagnostic"
         }),
     // Cover-specific definitions
-        coverInputAction: (name, endpointName) =>
+    coverSwitchAction: (name, endpointName) =>
         enumLookup({
             name,
             endpointName,
@@ -215,7 +216,17 @@ const romasku = {
             attribute: "presentValue",
             description: "Cover switch button press action",
         }),
-        coverOutputState: (name, endpointName) =>
+    coverSwitchType: (name, endpointName) =>
+        enumLookup({
+            name,
+            endpointName,
+            lookup: { toggle: 0, momentary: 1, momentary_nc: 2 },
+            cluster: "genOnOffSwitchCfg",
+            attribute: "switchType",
+            description: "Type of cover switch: toggle (rocker), momentary (push button), or momentary_nc (normally closed)",
+            entity_category: "config",
+        }),
+    coverMoving: (name, endpointName) =>
         enumLookup({
             name,
             endpointName,
@@ -227,9 +238,9 @@ const romasku = {
             },
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff06, type: 0x30 }, // Enum8
-            description: "Cover motor operational state",
+            description: "Cover movement status",
         }),
-    coverOutputReversal: (name, endpointName) =>
+    coverMotorReversal: (name, endpointName) =>
         binary({
             name,
             endpointName,
@@ -238,6 +249,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff07, type: 0x10 }, // Boolean
             description: "Reverse motor direction (swap OPEN/CLOSE relays)",
+            entity_category: "config",
         }),
     coverCalibration: (name, endpointName) =>
         binary({
@@ -248,6 +260,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff08, type: 0x10 }, // Boolean
             description: "Start calibration mode",
+            entity_category: "config",
         }),
     coverCalibrationTime: (name, endpointName) =>
         numeric({
@@ -259,6 +272,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff09, type: 0x21 }, // uint16
             description: "Total travel time between end positions",
+            entity_category: "config",
         }),
     coverOpenDelay: (name, endpointName) =>
         numeric({
@@ -272,6 +286,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff0a, type: 0x21 }, // uint16
             description: "Delay before opening starts from closed position (100ms units)",
+            entity_category: "config",
         }),
     coverCloseDelay: (name, endpointName) =>
         numeric({
@@ -285,56 +300,62 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff0b, type: 0x21 }, // uint16
             description: "Delay before closing starts from open position (100ms units)",
+            entity_category: "config",
         }),
-    coverInputOutputIndex: (name, endpointName, output_cnt) =>
+    coverSwitchOutputIndex: (name, endpointName, output_cnt) =>
         enumLookup({
             name,
             endpointName,
             lookup: Object.fromEntries(
                 Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_${i + 1}`, i + 1])
             ),
-            cluster: "closuresWindowCovering",
+            cluster: "genOnOffSwitchCfg",
             attribute: { ID: 0xff00, type: 0x20 }, // uint8
                 description: "Which cover to control locally",
+            entity_category: "config",
         }),
-        coverInputReversal: (name, endpointName) =>
+    coverSwitchInvert: (name, endpointName) =>
         binary({
             name,
             endpointName,
             valueOn: ["ON", 1],
             valueOff: ["OFF", 0],
-            cluster: "closuresWindowCovering",
+            cluster: "genOnOffSwitchCfg",
             attribute: {ID: 0xff01, type: 0x10},  // Boolean
-            description: "Reverse UP/DOWN direction for inputs",
+            description: "Inverts UP/DOWN direction for inputs",
             access: "ALL",
+            entity_category: "config",
         }),
-        coverInputLocalMode: (name, endpointName) =>
+    coverSwitchLocalMode: (name, endpointName) =>
         enumLookup({
             name,
             endpointName,
             lookup: { detached: 0, press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
-            cluster: "closuresWindowCovering",
+            cluster: "genOnOffSwitchCfg",
             attribute: { ID: 0xff02, type: 0x30 }, // Enum8
             description: "When to trigger local cover",
+            entity_category: "config",
         }),
-        coverInputBindedMode: (name, endpointName) =>
+    coverSwitchBindedMode: (name, endpointName) =>
         enumLookup({
             name,
             endpointName,
             lookup: { press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
-            cluster: "closuresWindowCovering",
+            cluster: "genOnOffSwitchCfg",
             attribute: { ID: 0xff03, type: 0x30 }, // Enum8
             description: "When to send commands to bound devices",
+            entity_category: "config",
         }),
-        coverInputLongPressDuration: (name, endpointName) =>
+    coverSwitchLongPressDuration: (name, endpointName) =>
         numeric({
             name,
             endpointNames: [endpointName],
-            cluster: "closuresWindowCovering",
+            cluster: "genOnOffSwitchCfg",
             attribute: { ID: 0xff04, type: 0x21 }, // uint16
             description: "Long press duration in milliseconds",
             valueMin: 0,
             valueMax: 5000,
+            entity_category: "config",
         }),
 };
 
@@ -353,40 +374,45 @@ const definitions = [
                 description: "Custom cover controller (https://github.com/romasku/tuya-zigbee-switch)",
         extend: [
             deviceEndpoints({ endpoints: {
-                {%- for inputName in device.coverInputNames -%}
+                {%- for inputName in device.coverSwitchNames -%}
                     "{{inputName}}": {{loop.index}},{{" "}}
                 {%- endfor -%}
-                {%- for outputName in device.coverOutputNames -%}
-                    "{{outputName}}": {{loop.index + (device.coverInputNames | length)}},{{" "}}
+                {%- for outputName in device.coverNames -%}
+                    "{{outputName}}": {{loop.index + (device.coverSwitchNames | length)}},{{" "}}
                 {%- endfor -%}
             } }),
-            romasku.deviceConfig("device_config", "{{device.coverInputNames[0]}}"),
+            romasku.deviceConfig("device_config", "{{device.coverSwitchNames[0]}}"),
             {% if device.has_dedicated_net_led %}
-            romasku.networkIndicator("network_led", "{{device.coverInputNames[0]}}"),
+            romasku.networkIndicator("network_led", "{{device.coverSwitchNames[0]}}"),
             {% endif %}
             
-            // Cover
-            {% for outputName in device.coverOutputNames %}
+            // Controls & Sensors
+            {% for outputName in device.coverNames %}
             windowCovering({ 
                 controls: ["lift"],
                 endpointNames: ["{{outputName}}"]
             }),
-            romasku.coverOutputState("status", "{{outputName}}"),
-            romasku.coverOutputReversal("reversal", "{{outputName}}"),
+            romasku.coverMoving("moving", "{{outputName}}"),
+            {% endfor %}
+            {% for inputName in device.coverSwitchNames %}
+            romasku.coverSwitchAction("switch_action", "{{inputName}}"),
+            {% endfor %}
+
+            // Configuration
+            {% for outputName in device.coverNames %}
+            romasku.coverMotorReversal("motor_reversal", "{{outputName}}"),
             romasku.coverCalibration("calibration", "{{outputName}}"),
             romasku.coverCalibrationTime("calibration_time", "{{outputName}}"),
             romasku.coverOpenDelay("open_delay", "{{outputName}}"),
             romasku.coverCloseDelay("close_delay", "{{outputName}}"),
             {% endfor %}
-            
-            // Cover switch
-            {% for inputName in device.coverInputNames %}
-            romasku.coverInputAction("action", "{{inputName}}"),
-            romasku.coverInputOutputIndex("output_index", "{{inputName}}", {{device.coverOutputNames | length}}),
-            romasku.coverInputReversal("reversal", "{{inputName}}"),
-            romasku.coverInputLocalMode("local_mode", "{{inputName}}"),
-            romasku.coverInputBindedMode("binded_mode", "{{inputName}}"),
-            romasku.coverInputLongPressDuration("long_press_duration", "{{inputName}}"),
+            {% for inputName in device.coverSwitchNames %}
+            romasku.coverSwitchType("switch_type", "{{inputName}}"),
+            romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
+            romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
+            romasku.coverSwitchLocalMode("local_mode", "{{inputName}}"),
+            romasku.coverSwitchBindedMode("binded_mode", "{{inputName}}"),
+            romasku.coverSwitchLongPressDuration("long_press_duration", "{{inputName}}"),
             {% endfor %}
         ],
 {% else %}
@@ -434,7 +460,7 @@ const definitions = [
         configure: async (device, coordinatorEndpoint, logger) => {
 {% if device.device_type == "cover" %}
             // Cover switch endpoints - button state reporting
-            {% for inputName in device.coverInputNames %}
+            {% for inputName in device.coverSwitchNames %}
             const input{{loop.index}} = device.getEndpoint({{loop.index}});
             await reporting.bind(input{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
             await input{{loop.index}}.configureReporting("genMultistateInput", [
@@ -447,8 +473,8 @@ const definitions = [
             ]);
             {% endfor %}
             // Cover endpoints - motor state and position reporting
-            {% for outputName in device.coverOutputNames %}
-            const output{{loop.index}} = device.getEndpoint({{loop.index + (device.coverInputNames | length)}});
+            {% for outputName in device.coverNames %}
+            const output{{loop.index}} = device.getEndpoint({{loop.index + (device.coverSwitchNames | length)}});
             await reporting.bind(output{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
             await output{{loop.index}}.configureReporting("closuresWindowCovering", [
                 {

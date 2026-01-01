@@ -83,8 +83,8 @@ if __name__ == "__main__":
                 "zb_models": [zb_model] + (device.get("old_zb_models") or []),
                 "model": device.get("override_z2m_device") or device["stock_converter_model"],
                 "device_type": "cover",
-                "coverInputNames": cover_switch_names,
-                "coverOutputNames": cover_names,
+                "coverSwitchNames": cover_switch_names,
+                "coverNames": cover_names,
                 "has_dedicated_net_led": has_dedicated_net_led,
             })
         else:

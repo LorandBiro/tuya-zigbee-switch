@@ -36,6 +36,7 @@ typedef struct {
   button_t *close_button;
   
   // Configuration attributes
+  uint8_t switch_type;             // Switch type (always 0x02 = multifunction)
   uint8_t output_index;            // Which cover to control locally
   uint8_t reversal;                // Swap OPEN/CLOSE (0=normal, 1=reversed)
   uint8_t local_mode;              // Detached/press_start/short/long/both
@@ -44,8 +45,8 @@ typedef struct {
   // State reporting
   uint16_t multistate_state;       // Current press action
   
-  hal_zigbee_attribute multistate_attr_infos[4];      // MultiStateInput attributes (state reporting)
-  hal_zigbee_attribute windowcovering_attr_infos[5];  // WindowCovering attributes (configuration)
+  hal_zigbee_attribute config_attr_infos[6];      // OnOffSwitchConfig attributes (configuration)
+  hal_zigbee_attribute multistate_attr_infos[4];  // MultiStateInput attributes (state reporting)
 } zigbee_cover_switch_cluster;
 
 void cover_switch_cluster_add_to_endpoint(
