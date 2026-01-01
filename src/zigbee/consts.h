@@ -14,6 +14,7 @@
 #define ZCL_CLUSTER_GROUPS                            0x0004
 #define ZCL_CLUSTER_OTA_BOOTLOAD                      0x0019
 #define ZCL_CLUSTER_WINDOW_COVERING                   0x0102
+#define ZCL_CLUSTER_COVER_SWITCH_CONFIG               0xFC01
 
 
 // Attributes
@@ -86,12 +87,13 @@
 #define ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY                         0xff0a
 #define ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY                        0xff0b
 
-// Custom manufacturer-specific attributes (cover switch - on WindowCovering CLIENT cluster)
-#define ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX        0xff00
-#define ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL            0xff01
-#define ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE          0xff02
-#define ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE         0xff03
-#define ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR      0xff04
+// Cover Switch Configuration cluster
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE       0x0000
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_OUTPUT_INDEX      0x0001
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_REVERSAL          0x0002
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_LOCAL_MODE        0x0003
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_BINDED_MODE       0x0004
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_LONG_PRESS_DUR    0x0005
 
 // OTA cluster
 

@@ -14,11 +14,12 @@ static void zigbee_on_attr_change(uint8_t endpoint, uint8_t cluster_id,
     basic_cluster_callback_attr_write_trampoline(attribute_id);
   } else if (cluster_id == ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG) {
     switch_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
+  } else if (cluster_id == ZCL_CLUSTER_COVER_SWITCH_CONFIG) {
+    cover_switch_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
   } else if (cluster_id == ZCL_CLUSTER_ON_OFF) {
     relay_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
   } else if (cluster_id == ZCL_CLUSTER_WINDOW_COVERING) {
     cover_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
-    cover_switch_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
   }
 }
 

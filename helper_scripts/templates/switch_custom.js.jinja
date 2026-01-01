@@ -6,10 +6,12 @@ const {
     text,
     binary,
     windowCovering,
+    deviceAddCustomCluster,
 } = require("zigbee-herdsman-converters/lib/modernExtend");
 const {assertString} = require("zigbee-herdsman-converters/lib/utils");
 const reporting = require("zigbee-herdsman-converters/lib/reporting");
 const constants = require("zigbee-herdsman-converters/lib/constants");
+const Zcl = require('zigbee-herdsman').Zcl;
 {% if z2m_v1 %}
 const ota = require("zigbee-herdsman-converters/lib/ota");
 {% endif%}
@@ -221,7 +223,7 @@ const romasku = {
             name,
             endpointName,
             lookup: { toggle: 0, momentary: 1, momentary_nc: 2 },
-            cluster: "genOnOffSwitchCfg",
+            cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "switchType",
             description: "Type of cover switch: toggle (rocker), momentary (push button), or momentary_nc (normally closed)",
             entity_category: "config",
@@ -311,9 +313,9 @@ const romasku = {
             lookup: Object.fromEntries(
                 Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_${i + 1}`, i + 1])
             ),
-            cluster: "genOnOffSwitchCfg",
-            attribute: { ID: 0xff00, type: 0x20 }, // uint8
-                description: "Which cover to control locally",
+            cluster: "manuSpecificTuyaCoverSwitchConfig",
+            attribute: "outputIndex",
+            description: "Which cover to control locally",
             entity_category: "config",
         }),
     coverSwitchInvert: (name, endpointName) =>
@@ -322,8 +324,8 @@ const romasku = {
             endpointName,
             valueOn: ["ON", 1],
             valueOff: ["OFF", 0],
-            cluster: "genOnOffSwitchCfg",
-            attribute: {ID: 0xff01, type: 0x10},  // Boolean
+            cluster: "manuSpecificTuyaCoverSwitchConfig",
+            attribute: "reversal",
             description: "Inverts UP/DOWN direction for inputs",
             access: "ALL",
             entity_category: "config",
@@ -333,8 +335,8 @@ const romasku = {
             name,
             endpointName,
             lookup: { detached: 0, press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
-            cluster: "genOnOffSwitchCfg",
-            attribute: { ID: 0xff02, type: 0x30 }, // Enum8
+            cluster: "manuSpecificTuyaCoverSwitchConfig",
+            attribute: "localMode",
             description: "When to trigger local cover",
             entity_category: "config",
         }),
@@ -343,8 +345,8 @@ const romasku = {
             name,
             endpointName,
             lookup: { press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
-            cluster: "genOnOffSwitchCfg",
-            attribute: { ID: 0xff03, type: 0x30 }, // Enum8
+            cluster: "manuSpecificTuyaCoverSwitchConfig",
+            attribute: "bindedMode",
             description: "When to send commands to bound devices",
             entity_category: "config",
         }),
@@ -352,8 +354,8 @@ const romasku = {
         numeric({
             name,
             endpointNames: [endpointName],
-            cluster: "genOnOffSwitchCfg",
-            attribute: { ID: 0xff04, type: 0x21 }, // uint16
+            cluster: "manuSpecificTuyaCoverSwitchConfig",
+            attribute: "longPressDuration",
             description: "Long press duration in milliseconds",
             valueMin: 0,
             valueMax: 5000,
@@ -375,6 +377,20 @@ const definitions = [
         vendor: "Tuya-custom",
                 description: "Custom cover controller (https://github.com/romasku/tuya-zigbee-switch)",
         extend: [
+            deviceAddCustomCluster("manuSpecificTuyaCoverSwitchConfig", {
+                ID: 0xFC01,
+                manufacturerCode: 0x125D,
+                attributes: {
+                    switchType: {ID: 0x0000, type: Zcl.DataType.ENUM8},
+                    outputIndex: {ID: 0x0001, type: Zcl.DataType.UINT8},
+                    reversal: {ID: 0x0002, type: Zcl.DataType.BOOLEAN},
+                    localMode: {ID: 0x0003, type: Zcl.DataType.ENUM8},
+                    bindedMode: {ID: 0x0004, type: Zcl.DataType.ENUM8},
+                    longPressDuration: {ID: 0x0005, type: Zcl.DataType.UINT16},
+                },
+                commands: {},
+                commandsResponse: {},
+            }),
             deviceEndpoints({ endpoints: {
                 {%- for inputName in device.coverSwitchNames -%}
                     "{{inputName}}": {{loop.index}},{{" "}}

@@ -15,15 +15,15 @@
 // ============================================================================
 
 hal_zigbee_cmd_result_t cover_cluster_callback(zigbee_cover_cluster *cluster,
-                                                uint8_t command_id,
-                                                void *cmd_payload);
+    uint8_t command_id,
+    void *cmd_payload);
 hal_zigbee_cmd_result_t cover_cluster_callback_trampoline(uint8_t endpoint,
-                                                          uint8_t cluster_id,
-                                                          uint8_t command_id,
-                                                          void *cmd_payload);
+    uint8_t cluster_id,
+    uint8_t command_id,
+    void *cmd_payload);
 
 void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
-                                 uint16_t attribute_id);
+                                          uint16_t attribute_id);
 
 void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster);
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster);
@@ -51,9 +51,9 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_position)
 zigbee_cover_cluster *cover_cluster_by_endpoint[10];
 
 void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
-                                                  uint16_t attribute_id) {
+                                                           uint16_t attribute_id) {
   cover_cluster_on_write_attr(cover_cluster_by_endpoint[endpoint],
-                              attribute_id);
+                                       attribute_id);
 }
 
 // ============================================================================
@@ -677,7 +677,7 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
 // ============================================================================
 
 void cover_cluster_add_to_endpoint(zigbee_cover_cluster *cluster,
-                                   hal_zigbee_endpoint *endpoint) {
+    hal_zigbee_endpoint *endpoint) {
   cover_cluster_by_endpoint[endpoint->endpoint] = cluster;
   cluster->endpoint = endpoint->endpoint;
   cover_cluster_load_attrs_from_nv(cluster);
@@ -710,19 +710,19 @@ void cover_cluster_add_to_endpoint(zigbee_cover_cluster *cluster,
 }
 
 hal_zigbee_cmd_result_t cover_cluster_callback_trampoline(uint8_t endpoint,
-                                                          uint8_t cluster_id,
-                                                          uint8_t command_id,
-                                                          void *cmd_payload) {
+    uint8_t cluster_id,
+    uint8_t command_id,
+    void *cmd_payload) {
   return cover_cluster_callback(cover_cluster_by_endpoint[endpoint], command_id,
                                 cmd_payload);
 }
 
 hal_zigbee_cmd_result_t cover_cluster_callback(zigbee_cover_cluster *cluster,
-                                               uint8_t command_id,
-                                               void *cmd_payload) {
-
+    uint8_t command_id,
+    void *cmd_payload) {
+  
   printf("Cover command: %d\r\n", command_id);
-
+  
   switch (command_id) {
   case ZCL_CMD_WINDOW_COVERING_UP_OPEN:
     cover_open(cluster);

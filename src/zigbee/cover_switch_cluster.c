@@ -66,28 +66,28 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
       (ev_button_callback_t)cover_switch_cluster_on_close_button_long_press;
   cluster->close_button->callback_param = cluster;
 
-  // Configuration attributes on OnOffSwitchConfig SERVER cluster
+  // Configuration attributes on CoverSwitchConfig SERVER cluster (manufacturer-specific)
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 0,
-                      ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_TYPE, ZCL_DATA_TYPE_ENUM8,
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE, ZCL_DATA_TYPE_ENUM8,
                       ATTR_WRITABLE, cluster->switch_type);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 1,
-                      ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX, ZCL_DATA_TYPE_UINT8,
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_OUTPUT_INDEX, ZCL_DATA_TYPE_UINT8,
                       ATTR_WRITABLE, cluster->output_index);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 2,
-                      ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL, ZCL_DATA_TYPE_BOOLEAN,
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_REVERSAL, ZCL_DATA_TYPE_BOOLEAN,
                       ATTR_WRITABLE, cluster->reversal);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 3,
-                      ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE, ZCL_DATA_TYPE_ENUM8,
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_LOCAL_MODE, ZCL_DATA_TYPE_ENUM8,
                       ATTR_WRITABLE, cluster->local_mode);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 4,
-                      ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE, ZCL_DATA_TYPE_ENUM8,
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_BINDED_MODE, ZCL_DATA_TYPE_ENUM8,
                       ATTR_WRITABLE, cluster->binded_mode);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 5,
-                      ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR, ZCL_DATA_TYPE_UINT16,
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_LONG_PRESS_DUR, ZCL_DATA_TYPE_UINT16,
                       ATTR_WRITABLE, cluster->open_button->long_press_duration_ms);
 
-  // OnOffSwitchConfig SERVER cluster (for configuration)
-  endpoint->clusters[endpoint->cluster_count].cluster_id = ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG;
+  // CoverSwitchConfig SERVER cluster (manufacturer-specific)
+  endpoint->clusters[endpoint->cluster_count].cluster_id = ZCL_CLUSTER_COVER_SWITCH_CONFIG;
   endpoint->clusters[endpoint->cluster_count].attribute_count = 6;
   endpoint->clusters[endpoint->cluster_count].attributes = cluster->config_attr_infos;
   endpoint->clusters[endpoint->cluster_count].is_server = 1;
@@ -272,14 +272,14 @@ void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluste
 void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
                                          uint16_t attribute_id) {
   switch (attribute_id) {
-  case ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_TYPE:
-  case ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX:
-  case ZCL_ATTR_WINDOW_COVERING_INPUT_REVERSAL:
-  case ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE:
-  case ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_OUTPUT_INDEX:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_REVERSAL:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_LOCAL_MODE:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_BINDED_MODE:
     cover_switch_cluster_store_attrs_to_nv(cluster);
     break;
-  case ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_LONG_PRESS_DUR:
     // Long press duration is shared between open and close buttons
     cluster->close_button->long_press_duration_ms = 
         cluster->open_button->long_press_duration_ms;

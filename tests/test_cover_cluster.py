@@ -18,6 +18,7 @@ from zcl_consts import (
     ZCL_CLUSTER_BASIC,
     ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
     ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG,
+    ZCL_CLUSTER_COVER_SWITCH_CONFIG,
     ZCL_CLUSTER_WINDOW_COVERING,
     ZCL_CMD_WINDOW_COVERING_UP_OPEN,
     ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE,
@@ -70,10 +71,10 @@ def test_girier_cover_endpoint_layout():
             )
             assert multistate in ("0", "1", "2", "3", "4", "5"), f"EP{ep} missing MultiStateInput"
             
-            # Check custom cover switch config attributes on OnOffSwitchConfig server
+            # Check custom cover switch config attributes on CoverSwitchConfig server
             output_idx = d.read_zigbee_attr(
                 ep, 
-                ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG,
+                ZCL_CLUSTER_COVER_SWITCH_CONFIG,
                 ZCL_ATTR_COVER_SWITCH_OUTPUT_INDEX
             )
             assert output_idx is not None, f"EP{ep} missing output_index attribute"
