@@ -475,8 +475,8 @@ void cover_complete_calibration(zigbee_cover_cluster *cluster) {
   }
 
   if (measured_time > 1200) {
-    printf("WARNING: Calibration very long (%u units = %.1f s)\r\n",
-           measured_time, measured_time / 10.0f);
+    printf("WARNING: Calibration very long (%u units = %u.%u s)\r\n",
+           measured_time, measured_time / 10, measured_time % 10);
   }
 
   // Cancel timeout
@@ -488,8 +488,8 @@ void cover_complete_calibration(zigbee_cover_cluster *cluster) {
 
   // Save calibration time
   cluster->calibration_time = measured_time;
-  printf("Calibration saved: %u units (%.1f seconds)\r\n", measured_time,
-         measured_time / 10.0f);
+  printf("Calibration saved: %u units (%u.%u seconds)\r\n", measured_time,
+         measured_time / 10, measured_time % 10);
 
   // Set position to endpoint based on direction
   if (cluster->calibration_direction ==
@@ -563,8 +563,9 @@ void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
   data[6] = (cluster->close_delay >> 8) & 0xFF;
 
   hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx, 7, data);
-  printf("Config saved to NVM: calib_time=%u (%.1fs)\r\n",
-         cluster->calibration_time, cluster->calibration_time / 10.0f);
+  printf("Config saved to NVM: calib_time=%u (%u.%us)\r\n",
+         cluster->calibration_time, cluster->calibration_time / 10,
+         cluster->calibration_time % 10);
 }
 
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
@@ -582,8 +583,9 @@ void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
     cluster->calibration_time = data[1] | (data[2] << 8);
     cluster->open_delay = data[3] | (data[4] << 8);
     cluster->close_delay = data[5] | (data[6] << 8);
-    printf("Config loaded from NVM: calib_time=%u (%.1fs)\r\n",
-           cluster->calibration_time, cluster->calibration_time / 10.0f);
+    printf("Config loaded from NVM: calib_time=%u (%u.%us)\r\n",
+           cluster->calibration_time, cluster->calibration_time / 10,
+           cluster->calibration_time % 10);
   }
 
   // Initialize runtime state
