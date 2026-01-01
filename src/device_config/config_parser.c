@@ -238,8 +238,8 @@ void parse_config() {
       cover_clusters[cover_clusters_cnt].close_relay = close_relay;
       cover_clusters[cover_clusters_cnt].output_idx = cover_clusters_cnt;
       cover_clusters[cover_clusters_cnt].reversal = 0;  // No reversal
-      cover_clusters[cover_clusters_cnt].window_covering_type = ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE;
-      cover_clusters[cover_clusters_cnt].status = 0;  // Stopped
+      cover_clusters[cover_clusters_cnt].window_covering_type = 0;
+      cover_clusters[cover_clusters_cnt].moving = 0;  // Stopped
       cover_clusters[cover_clusters_cnt].position = 50;  // Unknown position
       cover_clusters_cnt++;
     } else if (entry[0] == 'i') {

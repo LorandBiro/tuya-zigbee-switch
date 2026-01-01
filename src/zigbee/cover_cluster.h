@@ -3,49 +3,35 @@
 
 #include "base_components/relay.h"
 #include "hal/zigbee.h"
+#include "hal/tasks.h"
 #include <stdint.h>
-
-// WindowCovering operational status values (bitmap - NOT USED)
-// These were from ZCL spec but we use simpler enum values instead
-// #define WINDOW_COVERING_STATUS_OPERATIONAL 0x01
-// #define WINDOW_COVERING_STATUS_ONLINE 0x02
-// #define WINDOW_COVERING_STATUS_OPEN_CLOSE_COMMANDS_REVERSED 0x04
-// #define WINDOW_COVERING_STATUS_LIFT_CONTROL_CLOSED_LOOP 0x08
-// #define WINDOW_COVERING_STATUS_LIFT_POSITION_ENCODER 0x10
-// #define WINDOW_COVERING_STATUS_TILT_POSITION_ENCODER 0x20
-// #define WINDOW_COVERING_STATUS_LIFT_MOVING_OPENING 0x40
-// #define WINDOW_COVERING_STATUS_LIFT_MOVING_CLOSING 0x80
-
-// Simplified operational status enum values (manufacturer-specific attribute 0xff06)
-#define COVER_STATUS_STOPPED 0x00
-#define COVER_STATUS_OPENING 0x01
-#define COVER_STATUS_CLOSING 0x02
 
 typedef struct {
   uint8_t output_idx;
   uint8_t endpoint;
-  
-  // Physical relays
+
   relay_t *open_relay;
   relay_t *close_relay;
-  
-  // Configuration
-  uint8_t reversal;  // Motor reversal (0 = normal, 1 = reversed)
-  
-  // Calibration attributes
-  uint8_t calibration;        // Start calibration mode (bool)
-  uint16_t calibration_time;  // Total travel time in seconds (0-65535)
-  uint16_t open_delay;        // Delay before opening starts (in 100ms units)
-  uint16_t close_delay;       // Delay before closing starts (in 100ms units)
-  
-  // State reporting
-  uint8_t status;  // Custom attribute: 0=stopped, 1=opening, 2=closing
-  
-  // Zigbee attributes
-  uint8_t window_covering_type;  // 0x08 = Rollershade
-  uint8_t position;              // 0-100 (0=closed, 100=open)
-  
-  hal_zigbee_attribute attr_infos[8];  // WindowCovering attributes
+
+  uint8_t window_covering_type;
+  uint8_t position;
+  uint8_t moving;
+  uint8_t reversal;
+  uint8_t calibration;
+  uint16_t calibration_time;
+  uint16_t open_delay;
+  uint16_t close_delay;
+
+  // Timing state
+  uint32_t movement_start_time;      // When current movement started (hal_millis)
+  uint8_t start_position;            // Position when movement started (0-100)
+  uint8_t target_position;           // Target position (0-100) or 255 for endpoint
+  uint8_t calibration_direction;     // Direction during calibration (OPENING/CLOSING)
+  hal_task_t stop_task;              // Scheduled task for auto-stop
+  hal_task_t position_update_task;   // Periodic position updates during movement
+  hal_task_t calibration_timeout_task; // Safety timeout during calibration
+
+  hal_zigbee_attribute attr_infos[8];
 } zigbee_cover_cluster;
 
 void cover_cluster_add_to_endpoint(
@@ -55,10 +41,9 @@ void cover_cluster_add_to_endpoint(
 void cover_open(zigbee_cover_cluster *cluster);
 void cover_close(zigbee_cover_cluster *cluster);
 void cover_stop(zigbee_cover_cluster *cluster);
+void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_position);
 
 void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                          uint16_t attribute_id);
 
 #endif
-
-

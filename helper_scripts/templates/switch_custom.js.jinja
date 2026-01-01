@@ -267,11 +267,13 @@ const romasku = {
             name,
             endpointName,
             valueMin: 0,
-            valueMax: 65535,
+            valueMax: 300,
+            valueStep: 0.1,
+            scale: 10,
             unit: "s",
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff09, type: 0x21 }, // uint16
-            description: "Total travel time between end positions",
+            description: "Total travel time between end positions (0.1s precision)",
             entity_category: "config",
         }),
     coverOpenDelay: (name, endpointName) =>
@@ -279,13 +281,13 @@ const romasku = {
             name,
             endpointName,
             valueMin: 0,
-            valueMax: 65535,
-            valueStep: 1,
+            valueMax: 300,
+            valueStep: 0.1,
             scale: 10,
-            unit: "ms",
+            unit: "s",
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff0a, type: 0x21 }, // uint16
-            description: "Delay before opening starts from closed position (100ms units)",
+            description: "Delay before opening starts from closed position (0.1s precision)",
             entity_category: "config",
         }),
     coverCloseDelay: (name, endpointName) =>
@@ -293,13 +295,13 @@ const romasku = {
             name,
             endpointName,
             valueMin: 0,
-            valueMax: 65535,
-            valueStep: 1,
+            valueMax: 300,
+            valueStep: 0.1,
             scale: 10,
-            unit: "ms",
+            unit: "s",
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff0b, type: 0x21 }, // uint16
-            description: "Delay before closing starts from open position (100ms units)",
+            description: "Delay before closing starts from open position (0.1s precision)",
             entity_category: "config",
         }),
     coverSwitchOutputIndex: (name, endpointName, output_cnt) =>
@@ -479,12 +481,12 @@ const definitions = [
             await output{{loop.index}}.configureReporting("closuresWindowCovering", [
                 {
                     attribute: "currentPositionLiftPercentage",
-                    minimumReportInterval: 0,
+                    minimumReportInterval: 1,
                     maximumReportInterval: constants.repInterval.MAX,
                     reportableChange: 1,
                 },
                 {
-                    attribute: {ID: 0xff06, type: 0x30}, // operational_status, enum8
+                    attribute: {ID: 0xff06, type: 0x30}, // moving, enum8
                     minimumReportInterval: 0,
                     maximumReportInterval: constants.repInterval.MAX,
                     reportableChange: 1,

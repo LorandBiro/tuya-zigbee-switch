@@ -8,7 +8,7 @@ from zcl_consts import (
     ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE,
     ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
     ZCL_ATTR_WINDOW_COVERING_TYPE,
-    ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS,
+    ZCL_ATTR_WINDOW_COVERING_MOVING,
     ZCL_ATTR_WINDOW_COVERING_CALIBRATION,
     ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
     ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY,
@@ -84,7 +84,7 @@ def test_girier_cover_endpoint_layout():
             status = d.read_zigbee_attr(
                 ep,
                 ZCL_CLUSTER_WINDOW_COVERING,
-                ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS
+                ZCL_ATTR_WINDOW_COVERING_MOVING
             )
             # Should be stopped (0) initially
             assert int(status) == COVER_STOPPED, \
@@ -285,7 +285,7 @@ def test_cover_stop_command():
         status = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS
+            ZCL_ATTR_WINDOW_COVERING_MOVING
         )
         assert int(status) == COVER_STOPPED
         

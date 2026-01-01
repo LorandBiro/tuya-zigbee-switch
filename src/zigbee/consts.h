@@ -13,6 +13,7 @@
 #define ZCL_CLUSTER_LEVEL_CONTROL                     0x0008
 #define ZCL_CLUSTER_GROUPS                            0x0004
 #define ZCL_CLUSTER_OTA_BOOTLOAD                      0x0019
+#define ZCL_CLUSTER_WINDOW_COVERING                   0x0102
 
 
 // Attributes
@@ -75,18 +76,15 @@
 
 #define ZCL_ATTR_GROUP_NAME_SUPPORT                     0x0000
 
-// WindowCovering cluster (Closures domain)
-
-#define ZCL_CLUSTER_WINDOW_COVERING                        0x0102
-
-// Standard WindowCovering attributes
-#define ZCL_ATTR_WINDOW_COVERING_TYPE                      0x0000
-#define ZCL_ATTR_WINDOW_COVERING_PHYSICAL_CLOSED_LIMIT_LIFT    0x0001
-#define ZCL_ATTR_WINDOW_COVERING_PHYSICAL_CLOSED_LIMIT_TILT    0x0002
-#define ZCL_ATTR_WINDOW_COVERING_CONFIG_STATUS             0x0007
-#define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE    0x0008
-#define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_TILT_PERCENTAGE    0x0009
-#define ZCL_ATTR_WINDOW_COVERING_MODE                      0x0017
+// WindowCovering cluster
+#define ZCL_ATTR_WINDOW_COVERING_TYPE                               0x0000
+#define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE   0x0008
+#define ZCL_ATTR_WINDOW_COVERING_MOVING                             0xff06
+#define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL                     0xff07
+#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION                        0xff08
+#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME                   0xff09
+#define ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY                         0xff0a
+#define ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY                        0xff0b
 
 // Custom manufacturer-specific attributes (cover switch - on WindowCovering CLIENT cluster)
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_OUTPUT_INDEX        0xff00
@@ -94,14 +92,6 @@
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_LOCAL_MODE          0xff02
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_BINDED_MODE         0xff03
 #define ZCL_ATTR_WINDOW_COVERING_INPUT_LONG_PRESS_DUR      0xff04
-
-// Custom manufacturer-specific attributes (cover - on WindowCovering SERVER cluster)
-#define ZCL_ATTR_WINDOW_COVERING_OPERATIONAL_STATUS        0xff06
-#define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL            0xff07
-#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION               0xff08
-#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME          0xff09
-#define ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY                0xff0a
-#define ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY               0xff0b
 
 // OTA cluster
 
@@ -157,6 +147,12 @@
 #define ZCL_LEVEL_MOVE_UP                                     0x00
 #define ZCL_LEVEL_MOVE_DOWN                                   0x01
 
+// WindowCovering cluster
+
+#define ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED 0x00
+#define ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING 0x01
+#define ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING 0x02
+
 // Commands
 
 // OnOff Cluster
@@ -188,11 +184,6 @@
 #define ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE      0x05
 #define ZCL_CMD_WINDOW_COVERING_GO_TO_TILT_VALUE           0x07
 #define ZCL_CMD_WINDOW_COVERING_GO_TO_TILT_PERCENTAGE      0x08
-
-// WindowCovering types
-#define ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE               0x08
-#define ZCL_WINDOW_COVERING_TYPE_ROLLERSHADE_TWO_MOTORS    0x09
-#define ZCL_WINDOW_COVERING_TYPE_DRAPERY                   0x0A
 
 // WindowCovering Mode bitmap values
 #define ZCL_WINDOW_COVERING_MODE_MOTOR_REVERSED            0x01
