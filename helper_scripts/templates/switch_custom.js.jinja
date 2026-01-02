@@ -239,7 +239,7 @@ const romasku = {
                 closing: 2
             },
             cluster: "closuresWindowCovering",
-            attribute: { ID: 0xff06, type: 0x30 }, // Enum8
+            attribute: "moving",
             description: "Cover movement status",
         }),
     coverMotorReversal: (name, endpointName) =>
@@ -249,7 +249,7 @@ const romasku = {
             valueOn: [true, 1],
             valueOff: [false, 0],
             cluster: "closuresWindowCovering",
-            attribute: { ID: 0xff07, type: 0x10 }, // Boolean
+            attribute: "motorReversal",
             description: "Reverse motor direction (swap OPEN/CLOSE relays)",
             entity_category: "config",
         }),
@@ -260,7 +260,7 @@ const romasku = {
             valueOn: [true, 1],
             valueOff: [false, 0],
             cluster: "closuresWindowCovering",
-            attribute: { ID: 0xff08, type: 0x10 }, // Boolean
+            attribute: "calibration",
             description: "Start calibration mode",
             entity_category: "config",
         }),
@@ -274,7 +274,7 @@ const romasku = {
             scale: 10,
             unit: "s",
             cluster: "closuresWindowCovering",
-            attribute: { ID: 0xff09, type: 0x21 }, // uint16
+            attribute: "calibrationTime",
             description: "Total travel time between end positions (0.1s precision)",
             entity_category: "config",
         }),
@@ -288,7 +288,7 @@ const romasku = {
             scale: 10,
             unit: "s",
             cluster: "closuresWindowCovering",
-            attribute: { ID: 0xff0a, type: 0x21 }, // uint16
+            attribute: "closedSlack",
             description: "Mechanical slack at closed position (0%) in seconds (0.1s precision)",
             entity_category: "config",
         }),
@@ -302,7 +302,7 @@ const romasku = {
             scale: 10,
             unit: "s",
             cluster: "closuresWindowCovering",
-            attribute: { ID: 0xff0b, type: 0x21 }, // uint16
+            attribute: "openSlack",
             description: "Mechanical slack at open position (100%) in seconds (0.1s precision)",
             entity_category: "config",
         }),
@@ -391,6 +391,20 @@ const definitions = [
                 commands: {},
                 commandsResponse: {},
             }),
+            deviceAddCustomCluster("closuresWindowCovering", {
+                ID: 0x0102,
+                manufacturerCode: 0x125D,
+                attributes: {
+                    moving: {ID: 0xff06, type: Zcl.DataType.ENUM8},
+                    motorReversal: {ID: 0xff07, type: Zcl.DataType.BOOLEAN},
+                    calibration: {ID: 0xff08, type: Zcl.DataType.BOOLEAN},
+                    calibrationTime: {ID: 0xff09, type: Zcl.DataType.UINT16},
+                    closedSlack: {ID: 0xff0a, type: Zcl.DataType.UINT16},
+                    openSlack: {ID: 0xff0b, type: Zcl.DataType.UINT16},
+                },
+                commands: {},
+                commandsResponse: {},
+            }),
             deviceEndpoints({ endpoints: {
                 {%- for inputName in device.coverSwitchNames -%}
                     "{{inputName}}": {{loop.index}},{{" "}}
@@ -408,23 +422,19 @@ const definitions = [
             {% for outputName in device.coverNames %}
             windowCovering({ 
                 controls: ["lift"],
+                coverInverted: true,
+                configureReporting: true,
                 endpointNames: ["{{outputName}}"]
             }),
             romasku.coverMoving("moving", "{{outputName}}"),
-            {% endfor %}
-            {% for inputName in device.coverSwitchNames %}
-            romasku.coverSwitchAction("switch_action", "{{inputName}}"),
-            {% endfor %}
-
-            // Configuration
-            {% for outputName in device.coverNames %}
-            romasku.coverMotorReversal("motor_reversal", "{{outputName}}"),
             romasku.coverCalibration("calibration", "{{outputName}}"),
             romasku.coverCalibrationTime("calibration_time", "{{outputName}}"),
             romasku.coverClosedSlack("closed_slack", "{{outputName}}"),
             romasku.coverOpenSlack("open_slack", "{{outputName}}"),
+            romasku.coverMotorReversal("motor_reversal", "{{outputName}}"),
             {% endfor %}
             {% for inputName in device.coverSwitchNames %}
+            romasku.coverSwitchAction("switch_action", "{{inputName}}"),
             romasku.coverSwitchType("switch_type", "{{inputName}}"),
             romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
             romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
@@ -483,7 +493,7 @@ const definitions = [
             await reporting.bind(input{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
             await input{{loop.index}}.configureReporting("genMultistateInput", [
                 {
-                    attribute: {ID: 0x0055, type: 0x21}, // presentValue, uint16
+                    attribute: "presentValue",
                     minimumReportInterval: 0,
                     maximumReportInterval: constants.repInterval.MAX,
                     reportableChange: 1,
@@ -496,13 +506,7 @@ const definitions = [
             await reporting.bind(output{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
             await output{{loop.index}}.configureReporting("closuresWindowCovering", [
                 {
-                    attribute: "currentPositionLiftPercentage",
-                    minimumReportInterval: 1,
-                    maximumReportInterval: constants.repInterval.MAX,
-                    reportableChange: 1,
-                },
-                {
-                    attribute: {ID: 0xff06, type: 0x30}, // moving, enum8
+                    attribute: "moving",
                     minimumReportInterval: 0,
                     maximumReportInterval: constants.repInterval.MAX,
                     reportableChange: 1,
