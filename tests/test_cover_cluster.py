@@ -314,7 +314,7 @@ def test_cover_calibration_attributes():
             ZCL_CLUSTER_WINDOW_COVERING,
             ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME
         )
-        assert calibration_time == "0", "Initial calibration_time should be 0"
+        assert calibration_time == "300", "Initial calibration_time should be 300"
         
         closed_slack = d.read_zigbee_attr(
             1,

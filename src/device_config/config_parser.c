@@ -236,11 +236,7 @@ void parse_config() {
 
       cover_clusters[cover_clusters_cnt].open_relay = open_relay;
       cover_clusters[cover_clusters_cnt].close_relay = close_relay;
-      cover_clusters[cover_clusters_cnt].output_idx = cover_clusters_cnt;
-      cover_clusters[cover_clusters_cnt].reversal = 0;  // No reversal
-      cover_clusters[cover_clusters_cnt].window_covering_type = 0;
-      cover_clusters[cover_clusters_cnt].moving = 0;  // Stopped
-      cover_clusters[cover_clusters_cnt].position = 50;  // Unknown position
+      cover_clusters[cover_clusters_cnt].cover_idx = cover_clusters_cnt;
       cover_clusters_cnt++;
     } else if (entry[0] == 'i') {
       uint32_t image_type = parse_int(entry + 1);

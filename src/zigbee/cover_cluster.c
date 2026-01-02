@@ -27,6 +27,7 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
 
 void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster);
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster);
+void cover_cluster_init(zigbee_cover_cluster *cluster);
 
 // Timing & position helpers
 uint8_t motor_to_cover_position(zigbee_cover_cluster *cluster);
@@ -61,11 +62,27 @@ void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
 // ============================================================================
 // Section 2.5: Position conversion functions
 // ============================================================================
-
-// Convert motor position (basis points) to cover position (0-100%)
+// motor_position_bp: Physical motor position as basis points (0.01% precision)
+//   - Range: 0 (fully closed = 0.00%) to 10000 (fully open = 100.00%)
+//   - Stored as basis points for high precision without floating point
+//   - Works with separate opening/closing calibration times
 //
-// The motor position is a percentage that accounts for total runtime including
-// slack zones. This function maps it to the reported cover position.
+// Relationship to cover position (0-100%):
+//   - Motor position is converted to cover position by accounting for slack zones
+//   - Slack zones are time-based, so conversion depends on calibration_time
+//
+// Example with closed_slack=5s, open_slack=3s, calibration_time=30s:
+//   Closed slack:     0ms - 5000ms    = 16.67% of time = motor_position_bp 0 - 1667
+//   Effective travel: 5000ms - 27000ms = 73.33% of time = motor_position_bp 1667 - 9000
+//   Open slack:       27000ms - 30000ms = 10.00% of time = motor_position_bp 9000 - 10000
+//
+//   motor_position_bp = 0      → position = 0%   (fully closed)
+//   motor_position_bp = 1000   → position = 0%   (in closed slack zone)
+//   motor_position_bp = 1667   → position = 0%   (end of closed slack)
+//   motor_position_bp = 5333   → position = 50%  (middle of effective travel)
+//   motor_position_bp = 9000   → position = 100% (start of open slack)
+//   motor_position_bp = 10000  → position = 100% (fully open)
+
 uint8_t motor_to_cover_position(zigbee_cover_cluster *cluster) {
   uint32_t calibration_ms = cluster->calibration_time * 100;
   uint32_t closed_slack_ms = cluster->closed_slack * 100;
@@ -93,9 +110,6 @@ uint8_t motor_to_cover_position(zigbee_cover_cluster *cluster) {
   return (travel_ms * 100) / effective_ms;
 }
 
-// Convert cover position (0-100%) to motor position (basis points)
-//
-// Maps the desired cover position to the corresponding motor position percentage.
 uint16_t cover_to_motor_position(zigbee_cover_cluster *cluster, uint8_t cover_pos) {
   if (cover_pos == 0) {
     return 0;  // Fully closed = 0.00%
@@ -401,13 +415,11 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
   // Schedule auto-stop
   cluster->stop_task.handler = cover_auto_stop_handler;
   cluster->stop_task.arg = cluster;
-  hal_tasks_init(&cluster->stop_task);
   hal_tasks_schedule(&cluster->stop_task, duration_ms);
   
   // Schedule periodic position updates
   cluster->position_update_task.handler = cover_position_update_handler;
   cluster->position_update_task.arg = cluster;
-  hal_tasks_init(&cluster->position_update_task);
   cover_schedule_next_position_update(cluster);
   
   // Notify moving state changed
@@ -451,7 +463,6 @@ void cover_start_calibration_movement(zigbee_cover_cluster *cluster,
   // Schedule safety timeout (120 seconds)
   cluster->calibration_timeout_task.handler = cover_calibration_timeout_handler;
   cluster->calibration_timeout_task.arg = cluster;
-  hal_tasks_init(&cluster->calibration_timeout_task);
   hal_tasks_schedule(&cluster->calibration_timeout_task, 120000);
 
   // Notify moving state changed
@@ -563,21 +574,18 @@ void cover_calibration_timeout_handler(void *arg) {
 // Section 6: NVM storage/loading
 // ============================================================================
 
-void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
-  // Store: reversal (1) + calibration_time (2) + closed_slack (2) + 
-  //        open_slack (2) + motor_position_bp (2) = 9 bytes
-  uint8_t data[9];
-  data[0] = cluster->reversal;
-  data[1] = cluster->calibration_time & 0xFF;
-  data[2] = (cluster->calibration_time >> 8) & 0xFF;
-  data[3] = cluster->closed_slack & 0xFF;
-  data[4] = (cluster->closed_slack >> 8) & 0xFF;
-  data[5] = cluster->open_slack & 0xFF;
-  data[6] = (cluster->open_slack >> 8) & 0xFF;
-  data[7] = cluster->motor_position_bp & 0xFF;
-  data[8] = (cluster->motor_position_bp >> 8) & 0xFF;
+static zigbee_cover_cluster_config nv_config_buffer;
 
-  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx, 9, data);
+void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
+  nv_config_buffer.reversal = cluster->reversal;
+  nv_config_buffer.calibration_time = cluster->calibration_time;
+  nv_config_buffer.closed_slack = cluster->closed_slack;
+  nv_config_buffer.open_slack = cluster->open_slack;
+  nv_config_buffer.motor_position_bp = cluster->motor_position_bp;
+
+  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->cover_idx,
+                sizeof(zigbee_cover_cluster_config),
+                (uint8_t *)&nv_config_buffer);
   printf("Config saved to NVM: calib_time=%u (%u.%us), motor_pos=%u.%02u%%\r\n",
          cluster->calibration_time, cluster->calibration_time / 10,
          cluster->calibration_time % 10,
@@ -585,39 +593,40 @@ void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
 }
 
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
-  uint8_t data[9];
-  uint8_t read_status =
-      hal_nvm_read(NVM_COVER_0_CONFIG + cluster->output_idx, 9, data);
-  if (read_status != 0) {
-    // Default values (all timing values are in 100ms units)
-    cluster->reversal = 0;         // No reversal
-    cluster->calibration_time = 0; // Not calibrated
-    cluster->closed_slack = 0;     // No slack
-    cluster->open_slack = 0;       // No slack
-    cluster->motor_position_bp = 0; // Fully closed = 0.00%
-  } else {
-    cluster->reversal = data[0];
-    cluster->calibration_time = data[1] | (data[2] << 8);
-    cluster->closed_slack = data[3] | (data[4] << 8);
-    cluster->open_slack = data[5] | (data[6] << 8);
-    cluster->motor_position_bp = data[7] | (data[8] << 8);
-    printf("Config loaded from NVM: calib_time=%u (%u.%us), motor_pos=%u.%02u%%\r\n",
-           cluster->calibration_time, cluster->calibration_time / 10,
-           cluster->calibration_time % 10,
-           cluster->motor_position_bp / 100, cluster->motor_position_bp % 100);
+  hal_nvm_status_t st = hal_nvm_read(
+      NVM_COVER_0_CONFIG + cluster->cover_idx,
+      sizeof(zigbee_cover_cluster_config),
+      (uint8_t *)&nv_config_buffer);
+
+  if (st != HAL_NVM_SUCCESS) {
+    printf("No cover config in NV, using defaults\r\n");
+    return;
   }
 
-  // Calculate cover position from motor position
+  cluster->reversal = nv_config_buffer.reversal;
+  cluster->calibration_time = nv_config_buffer.calibration_time;
+  cluster->closed_slack = nv_config_buffer.closed_slack;
+  cluster->open_slack = nv_config_buffer.open_slack;
+  cluster->motor_position_bp = nv_config_buffer.motor_position_bp;
   cluster->position = motor_to_cover_position(cluster);
+}
 
-  // Initialize runtime state
+void cover_cluster_init(zigbee_cover_cluster *cluster) {
+  // Attributes
+  cluster->window_covering_type = 0;
+  cluster->position = 50; // 50%
   cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
+  cluster->reversal = 0;
   cluster->calibration = 0;
+  cluster->calibration_time = 300;
+  cluster->closed_slack = 0;
+  cluster->open_slack = 0;
+
+  // State
+  cluster->motor_position_bp = 5000; // 50%
   cluster->movement_start_time = 0;
   cluster->start_motor_position_bp = 0;
   cluster->calibration_direction = 0;
-
-  // Initialize tasks
   hal_tasks_init(&cluster->stop_task);
   hal_tasks_init(&cluster->position_update_task);
   hal_tasks_init(&cluster->calibration_timeout_task);
@@ -701,6 +710,7 @@ void cover_cluster_add_to_endpoint(zigbee_cover_cluster *cluster,
     hal_zigbee_endpoint *endpoint) {
   cover_cluster_by_endpoint[endpoint->endpoint] = cluster;
   cluster->endpoint = endpoint->endpoint;
+  cover_cluster_init(cluster);
   cover_cluster_load_attrs_from_nv(cluster);
 
   SETUP_ATTR(0, ZCL_ATTR_WINDOW_COVERING_TYPE, ZCL_DATA_TYPE_ENUM8,
