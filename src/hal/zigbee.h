@@ -107,7 +107,7 @@ void hal_zigbee_notify_attribute_changed(uint8_t endpoint, uint16_t cluster_id,
 
 /** Function called when attribute is written via Zigbee */
 typedef void (*hal_attribute_change_callback_t)(uint8_t endpoint,
-                                                uint8_t cluster_id,
+                                                uint16_t cluster_id,
                                                 uint16_t attribute_id);
 
 /**
