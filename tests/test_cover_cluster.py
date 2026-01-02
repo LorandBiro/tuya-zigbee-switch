@@ -11,8 +11,8 @@ from zcl_consts import (
     ZCL_ATTR_WINDOW_COVERING_MOVING,
     ZCL_ATTR_WINDOW_COVERING_CALIBRATION,
     ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
-    ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY,
-    ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY,
+    ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
+    ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
     ZCL_ATTR_COVER_SWITCH_OUTPUT_INDEX,
     ZCL_ATTR_COVER_SWITCH_REVERSAL,
     ZCL_CLUSTER_BASIC,
@@ -316,19 +316,19 @@ def test_cover_calibration_attributes():
         )
         assert calibration_time == "0", "Initial calibration_time should be 0"
         
-        open_delay = d.read_zigbee_attr(
+        closed_slack = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY
+            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK
         )
-        assert open_delay == "0", "Initial open_delay should be 0"
+        assert closed_slack == "0", "Initial closed_slack should be 0"
         
-        close_delay = d.read_zigbee_attr(
+        open_slack = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY
+            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK
         )
-        assert close_delay == "0", "Initial close_delay should be 0"
+        assert open_slack == "0", "Initial open_slack should be 0"
         
         # Write calibration_time (e.g., 30 seconds)
         d.write_zigbee_attr(
@@ -347,39 +347,39 @@ def test_cover_calibration_attributes():
         )
         assert calibration_time == "30", "calibration_time should be 30"
         
-        # Write open_delay (e.g., 5 = 0.5 seconds in 100ms units)
+        # Write closed_slack (e.g., 5 = 0.5 seconds in 100ms units)
         d.write_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY,
+            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
             5
         )
         d.step_time(10)
         
         # Verify it was written
-        open_delay = d.read_zigbee_attr(
+        closed_slack = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY
+            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK
         )
-        assert open_delay == "5", "open_delay should be 5"
+        assert closed_slack == "5", "closed_slack should be 5"
         
-        # Write close_delay (e.g., 3 = 0.3 seconds in 100ms units)
+        # Write open_slack (e.g., 3 = 0.3 seconds in 100ms units)
         d.write_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY,
+            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
             3
         )
         d.step_time(10)
         
         # Verify it was written
-        close_delay = d.read_zigbee_attr(
+        open_slack = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY
+            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK
         )
-        assert close_delay == "3", "close_delay should be 3"
+        assert open_slack == "3", "open_slack should be 3"
         
     finally:
         p.stop()
@@ -402,13 +402,13 @@ def test_cover_calibration_attributes_persist():
         d.write_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY,
+            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
             10
         )
         d.write_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY,
+            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
             8
         )
         d.step_time(10)
@@ -421,19 +421,19 @@ def test_cover_calibration_attributes_persist():
         )
         assert calibration_time == "45", "calibration_time should be readable"
         
-        open_delay = d.read_zigbee_attr(
+        closed_slack = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY
+            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK
         )
-        assert open_delay == "10", "open_delay should be readable"
+        assert closed_slack == "10", "closed_slack should be readable"
         
-        close_delay = d.read_zigbee_attr(
+        open_slack = d.read_zigbee_attr(
             1,
             ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY
+            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK
         )
-        assert close_delay == "8", "close_delay should be readable"
+        assert open_slack == "8", "open_slack should be readable"
         
         # Note: NVM persistence testing would require stub device to support
         # cross-process NVM preservation, which may not be implemented yet

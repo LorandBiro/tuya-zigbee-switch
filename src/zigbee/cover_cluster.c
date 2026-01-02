@@ -29,7 +29,10 @@ void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster);
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster);
 
 // Timing & position helpers
+uint8_t motor_to_cover_position(zigbee_cover_cluster *cluster);
+uint16_t cover_to_motor_position(zigbee_cover_cluster *cluster, uint8_t cover_pos);
 void cover_update_position(zigbee_cover_cluster *cluster);
+void cover_schedule_next_position_update(zigbee_cover_cluster *cluster);
 void cover_position_update_handler(void *arg);
 void cover_auto_stop_handler(void *arg);
 void cover_cancel_movement_tasks(zigbee_cover_cluster *cluster);
@@ -41,7 +44,6 @@ void cover_complete_calibration(zigbee_cover_cluster *cluster);
 void cover_calibration_timeout_handler(void *arg);
 
 // Movement control
-void cover_start_movement(zigbee_cover_cluster *cluster, uint8_t direction);
 void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_position);
 
 // ============================================================================
@@ -54,6 +56,66 @@ void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                            uint16_t attribute_id) {
   cover_cluster_on_write_attr(cover_cluster_by_endpoint[endpoint],
                                        attribute_id);
+}
+
+// ============================================================================
+// Section 2.5: Position conversion functions
+// ============================================================================
+
+// Convert motor position (basis points) to cover position (0-100%)
+//
+// The motor position is a percentage that accounts for total runtime including
+// slack zones. This function maps it to the reported cover position.
+uint8_t motor_to_cover_position(zigbee_cover_cluster *cluster) {
+  uint32_t calibration_ms = cluster->calibration_time * 100;
+  uint32_t closed_slack_ms = cluster->closed_slack * 100;
+  uint32_t open_slack_ms = cluster->open_slack * 100;
+  
+  // Calculate motor position in milliseconds
+  uint32_t motor_ms = (cluster->motor_position_bp * calibration_ms) / 10000;
+  
+  // In closed slack zone: motor is running but cover hasn't started moving
+  if (motor_ms <= closed_slack_ms) {
+    return 0;
+  }
+  
+  // In open slack zone: cover has reached end but motor still running
+  if (motor_ms >= calibration_ms - open_slack_ms) {
+    return 100;
+  }
+  
+  // In effective travel zone: motor movement translates to cover movement
+  uint32_t effective_ms = calibration_ms - closed_slack_ms - open_slack_ms;
+  if (effective_ms == 0) {
+    effective_ms = 1;  // Prevent division by zero
+  }
+  uint32_t travel_ms = motor_ms - closed_slack_ms;
+  return (travel_ms * 100) / effective_ms;
+}
+
+// Convert cover position (0-100%) to motor position (basis points)
+//
+// Maps the desired cover position to the corresponding motor position percentage.
+uint16_t cover_to_motor_position(zigbee_cover_cluster *cluster, uint8_t cover_pos) {
+  if (cover_pos == 0) {
+    return 0;  // Fully closed = 0.00%
+  }
+  
+  if (cover_pos == 100) {
+    return 10000;  // Fully open = 100.00%
+  }
+  
+  // Map to effective travel zone (between slack zones)
+  uint32_t calibration_ms = cluster->calibration_time * 100;
+  uint32_t closed_slack_ms = cluster->closed_slack * 100;
+  uint32_t open_slack_ms = cluster->open_slack * 100;
+  uint32_t effective_ms = calibration_ms - closed_slack_ms - open_slack_ms;
+  
+  // Calculate target position in milliseconds
+  uint32_t target_ms = closed_slack_ms + (cover_pos * effective_ms) / 100;
+  
+  // Convert to percentage (basis points)
+  return (target_ms * 10000) / calibration_ms;
 }
 
 // ============================================================================
@@ -70,7 +132,19 @@ void cover_open(zigbee_cover_cluster *cluster) {
     return;
   }
 
-  cover_start_movement(cluster, ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING);
+  // If already fully open, ignore
+  if (cluster->position == 100) {
+    printf("Already fully open\r\n");
+    return;
+  }
+
+  // If already opening, ignore
+  if (cluster->moving == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
+    printf("Already opening\r\n");
+    return;
+  }
+
+  cover_goto_position(cluster, 100);
 }
 
 void cover_close(zigbee_cover_cluster *cluster) {
@@ -83,7 +157,19 @@ void cover_close(zigbee_cover_cluster *cluster) {
     return;
   }
 
-  cover_start_movement(cluster, ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING);
+  // If already fully closed, ignore
+  if (cluster->position == 0) {
+    printf("Already fully closed\r\n");
+    return;
+  }
+
+  // If already closing, ignore
+  if (cluster->moving == ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING) {
+    printf("Already closing\r\n");
+    return;
+  }
+
+  cover_goto_position(cluster, 0);
 }
 
 void cover_stop(zigbee_cover_cluster *cluster) {
@@ -132,75 +218,64 @@ void cover_cancel_movement_tasks(zigbee_cover_cluster *cluster) {
 }
 
 void cover_update_position(zigbee_cover_cluster *cluster) {
-  // Don't update if not moving or not calibrated
   if (cluster->moving == ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED ||
       cluster->calibration_time == 0) {
     return;
   }
-
-  // All timing values are in 100ms units, convert to milliseconds
-  uint32_t calibration_ms = (uint32_t)cluster->calibration_time * 100;
-  uint32_t open_delay_ms = (uint32_t)cluster->open_delay * 100;
-  uint32_t close_delay_ms = (uint32_t)cluster->close_delay * 100;
-
-  // Effective travel time excludes delays
-  uint32_t effective_time_ms = calibration_ms - open_delay_ms - close_delay_ms;
-  if (effective_time_ms == 0) {
-    effective_time_ms = 1; // Prevent division by zero
-  }
-
+  
+  // Calculate elapsed time as percentage of calibration time
   uint32_t elapsed_ms = hal_millis() - cluster->movement_start_time;
-  uint8_t new_position = cluster->position;
-
+  uint32_t calibration_ms = cluster->calibration_time * 100;
+  
+  // Convert elapsed time to percentage change (basis points)
+  // elapsed_bp = (elapsed_ms * 10000) / calibration_ms
+  uint32_t elapsed_bp = (elapsed_ms * 10000) / calibration_ms;
+  
   if (cluster->moving == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
-    // Opening: 0% (closed) -> 100% (open)
-    if (elapsed_ms < open_delay_ms) {
-      // Still in delay phase
-      new_position = cluster->start_position;
-    } else {
-      uint32_t travel_ms = elapsed_ms - open_delay_ms;
-      // Calculate position: start + (progress * distance / effective_time)
-      uint32_t distance = 100 - cluster->start_position;
-      uint32_t progress = (travel_ms * distance) / effective_time_ms;
-      new_position = cluster->start_position + progress;
-      if (new_position > 100)
-        new_position = 100;
+    uint32_t new_bp = cluster->start_motor_position_bp + elapsed_bp;
+    if (new_bp > 10000) {
+      new_bp = 10000;
     }
-  } else if (cluster->moving == ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING) {
-    // Closing: 100% (open) -> 0% (closed)
-    if (elapsed_ms < close_delay_ms) {
-      // Still in delay phase
-      new_position = cluster->start_position;
+    cluster->motor_position_bp = (uint16_t)new_bp;
+  } else {
+    if (elapsed_bp > cluster->start_motor_position_bp) {
+      cluster->motor_position_bp = 0;
     } else {
-      uint32_t travel_ms = elapsed_ms - close_delay_ms;
-      // Calculate position: start - (progress * distance / effective_time)
-      uint32_t distance = cluster->start_position;
-      uint32_t progress = (travel_ms * distance) / effective_time_ms;
-      if (progress > cluster->start_position) {
-        new_position = 0;
-      } else {
-        new_position = cluster->start_position - progress;
-      }
+      cluster->motor_position_bp = cluster->start_motor_position_bp - (uint16_t)elapsed_bp;
     }
   }
-
-  // Only update if position changed
-  if (new_position != cluster->position) {
-    cluster->position = new_position;
-    printf("Position updated: %d%%\r\n", new_position);
+  
+  // Convert motor position to cover position for Zigbee reporting
+  uint8_t new_cover_pos = motor_to_cover_position(cluster);
+  
+  if (new_cover_pos != cluster->position) {
+    cluster->position = new_cover_pos;
+    printf("Position updated: %d%% (motor: %u.%02u%%)\r\n",
+           new_cover_pos,
+           cluster->motor_position_bp / 100,
+           cluster->motor_position_bp % 100);
     hal_zigbee_notify_attribute_changed(cluster->endpoint,
                                        ZCL_CLUSTER_WINDOW_COVERING,
                                        ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE);
   }
 }
 
+void cover_schedule_next_position_update(zigbee_cover_cluster *cluster) {
+  uint32_t effective_travel_ms = (cluster->calibration_time - cluster->closed_slack - cluster->open_slack) * 100;
+  uint32_t update_interval_ms = effective_travel_ms / 100;
+  if (update_interval_ms < 100) {
+    update_interval_ms = 100;
+  }
+  hal_tasks_schedule(&cluster->position_update_task, update_interval_ms);
+}
+
 void cover_position_update_handler(void *arg) {
   zigbee_cover_cluster *cluster = (zigbee_cover_cluster *)arg;
   cover_update_position(cluster);
 
-  // Reschedule if still moving
+  // Reschedule if still moving - update every 1% of effective travel
   if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
-    hal_tasks_schedule(&cluster->position_update_task, 1000); // Update every 1 second
+    cover_schedule_next_position_update(cluster);
   }
 }
 
@@ -212,193 +287,129 @@ void cover_auto_stop_handler(void *arg) {
   relay_off(cluster->open_relay);
   relay_off(cluster->close_relay);
 
-  // Update to target position
-  cluster->position = cluster->target_position;
+  // Update motor position to final position
+  uint32_t elapsed_ms = hal_millis() - cluster->movement_start_time;
+  uint32_t calibration_ms = cluster->calibration_time * 100;
+  uint32_t elapsed_bp = (elapsed_ms * 10000) / calibration_ms;
+
+  if (cluster->moving == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
+    uint32_t new_bp = cluster->start_motor_position_bp + elapsed_bp;
+    if (new_bp > 10000) {
+      new_bp = 10000;
+    }
+    cluster->motor_position_bp = (uint16_t)new_bp;
+  } else {
+    if (elapsed_bp > cluster->start_motor_position_bp) {
+      cluster->motor_position_bp = 0;
+    } else {
+      cluster->motor_position_bp = cluster->start_motor_position_bp - (uint16_t)elapsed_bp;
+    }
+  }
+
   cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
+  cluster->position = motor_to_cover_position(cluster);
 
   // Cancel position update task
   hal_tasks_unschedule(&cluster->position_update_task);
 
-  // Send unsolicited position report when auto-stopping
+  // Send reports
   hal_zigbee_send_report_attr(cluster->endpoint,
                               ZCL_CLUSTER_WINDOW_COVERING,
                               ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE,
                               ZCL_DATA_TYPE_UINT8,
                               &cluster->position,
                               1);
-  // Notify moving state changed (for configured reporting)
   hal_zigbee_notify_attribute_changed(cluster->endpoint,
                                      ZCL_CLUSTER_WINDOW_COVERING,
                                      ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
-void cover_start_movement(zigbee_cover_cluster *cluster, uint8_t direction) {
-  uint8_t reversed = cluster->reversal;
-  relay_t *open_relay = reversed ? cluster->close_relay : cluster->open_relay;
-  relay_t *close_relay = reversed ? cluster->open_relay : cluster->close_relay;
-
-  // Cancel any existing movement tasks
-  cover_cancel_movement_tasks(cluster);
-
-  // SAFETY FIRST: Stop everything
-  relay_off(close_relay);
-  relay_off(open_relay);
-
-  // Record starting state
-  cluster->movement_start_time = hal_millis();
-  cluster->start_position = cluster->position;
-
-  if (direction == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
-    printf("Starting OPEN movement (reversed=%d, pos=%d)\r\n", reversed,
-           cluster->position);
-    cluster->target_position = 100;
-    relay_on(open_relay);
-  } else {
-    printf("Starting CLOSE movement (reversed=%d, pos=%d)\r\n", reversed,
-           cluster->position);
-    cluster->target_position = 0;
-    relay_on(close_relay);
-  }
-
-  cluster->moving = direction;
-
-  // Calculate duration and schedule auto-stop
-  if (cluster->calibration_time > 0) {
-    uint32_t duration_ms = (uint32_t)cluster->calibration_time * 100;
-    
-    // Adjust duration based on current position
-    if (direction == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
-      // Opening: only travel the remaining distance
-      duration_ms = (duration_ms * (100 - cluster->start_position)) / 100;
-    } else {
-      // Closing: only travel from current position to 0
-      duration_ms = (duration_ms * cluster->start_position) / 100;
-    }
-
-    printf("Auto-stop scheduled in %u ms\r\n", duration_ms);
-    cluster->stop_task.handler = cover_auto_stop_handler;
-    cluster->stop_task.arg = cluster;
-    hal_tasks_init(&cluster->stop_task);
-    hal_tasks_schedule(&cluster->stop_task, duration_ms);
-
-    // Schedule periodic position updates
-    cluster->position_update_task.handler = cover_position_update_handler;
-    cluster->position_update_task.arg = cluster;
-    hal_tasks_init(&cluster->position_update_task);
-    hal_tasks_schedule(&cluster->position_update_task, 1000); // Every 1 second
-  }
-
-  // Notify moving state changed
-  hal_zigbee_notify_attribute_changed(cluster->endpoint,
-                                     ZCL_CLUSTER_WINDOW_COVERING,
-                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
-}
-
-void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_position) {
-  printf("Go-to-position: target=%d%%, current=%d%%\r\n", target_position, cluster->position);
-
+void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos) {
   // Validate calibration
   if (cluster->calibration_time == 0) {
     printf("ERROR: Cannot go-to-position - not calibrated\r\n");
     return;
   }
-
-  // Clamp target to valid range
-  if (target_position > 100) {
-    target_position = 100;
+  
+  // Clamp target
+  if (target_cover_pos > 100) {
+    target_cover_pos = 100;
   }
-
-  // Check if already at target position
-  if (cluster->position == target_position) {
+  
+  // Check if already at target
+  if (cluster->position == target_cover_pos) {
     printf("Already at target position\r\n");
-    // If currently moving, stop it
     if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
       cover_stop(cluster);
     }
     return;
   }
-
-  // Determine direction based on current vs target position
+  
+  // Convert cover position to motor position (basis points)
+  uint16_t target_motor_bp = cover_to_motor_position(cluster, target_cover_pos);
+  uint16_t current_motor_bp = cluster->motor_position_bp;
+  
+  // Determine direction and calculate duration
   uint8_t direction;
-  if (target_position > cluster->position) {
-    // Need to open
+  uint32_t duration_ms;
+  uint32_t calibration_ms = cluster->calibration_time * 100;
+  
+  if (target_motor_bp > current_motor_bp) {
     direction = ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING;
+    // Duration = (percentage_delta / 100.00%) * calibration_time
+    duration_ms = ((target_motor_bp - current_motor_bp) * calibration_ms) / 10000;
   } else {
-    // Need to close
     direction = ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING;
+    duration_ms = ((current_motor_bp - target_motor_bp) * calibration_ms) / 10000;
   }
-
+  
+  // Setup motor
   uint8_t reversed = cluster->reversal;
   relay_t *open_relay = reversed ? cluster->close_relay : cluster->open_relay;
   relay_t *close_relay = reversed ? cluster->open_relay : cluster->close_relay;
-
-  // Cancel any existing movement tasks
+  
+  // Cancel any existing movement
   cover_cancel_movement_tasks(cluster);
-
-  // SAFETY FIRST: Stop everything
-  relay_off(close_relay);
+  
+  // SAFETY: Stop everything first
   relay_off(open_relay);
-
+  relay_off(close_relay);
+  
   // Record starting state
   cluster->movement_start_time = hal_millis();
-  cluster->start_position = cluster->position;
-  cluster->target_position = target_position;
-
-  // Start movement in the appropriate direction
+  cluster->start_motor_position_bp = current_motor_bp;
+  
+  // Start motor
   if (direction == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
-    printf("Moving OPEN: %d%% -> %d%%\r\n", cluster->position, target_position);
+    printf("Moving OPEN: %d%% -> %d%% (motor: %u.%02u%% -> %u.%02u%%, duration: %ums)\r\n",
+           cluster->position, target_cover_pos,
+           current_motor_bp / 100, current_motor_bp % 100,
+           target_motor_bp / 100, target_motor_bp % 100,
+           duration_ms);
     relay_on(open_relay);
   } else {
-    printf("Moving CLOSE: %d%% -> %d%%\r\n", cluster->position, target_position);
+    printf("Moving CLOSE: %d%% -> %d%% (motor: %u.%02u%% -> %u.%02u%%, duration: %ums)\r\n",
+           cluster->position, target_cover_pos,
+           current_motor_bp / 100, current_motor_bp % 100,
+           target_motor_bp / 100, target_motor_bp % 100,
+           duration_ms);
     relay_on(close_relay);
   }
-
-  cluster->moving = direction;
-
-  // Calculate duration based on distance to travel
-  // All timing values are in 100ms units, convert to milliseconds
-  uint32_t calibration_ms = (uint32_t)cluster->calibration_time * 100;
-  uint32_t open_delay_ms = (uint32_t)cluster->open_delay * 100;
-  uint32_t close_delay_ms = (uint32_t)cluster->close_delay * 100;
-
-  // Effective travel time (excludes delays)
-  uint32_t effective_time_ms = calibration_ms - open_delay_ms - close_delay_ms;
-  if (effective_time_ms == 0) {
-    effective_time_ms = 1; // Prevent division by zero
-  }
-
-  // Calculate distance to travel as percentage
-  uint8_t distance;
-  if (target_position > cluster->start_position) {
-    distance = target_position - cluster->start_position;
-  } else {
-    distance = cluster->start_position - target_position;
-  }
-
-  // Duration = (distance / 100) * effective_time + delay
-  uint32_t duration_ms = (effective_time_ms * distance) / 100;
   
-  // Add appropriate delay
-  if (direction == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
-    duration_ms += open_delay_ms;
-  } else {
-    duration_ms += close_delay_ms;
-  }
-
-  printf("Go-to-position scheduled: %u ms to reach %d%%\r\n", duration_ms, target_position);
-
-  // Schedule auto-stop at target position
+  cluster->moving = direction;
+  
+  // Schedule auto-stop
   cluster->stop_task.handler = cover_auto_stop_handler;
   cluster->stop_task.arg = cluster;
   hal_tasks_init(&cluster->stop_task);
   hal_tasks_schedule(&cluster->stop_task, duration_ms);
-
+  
   // Schedule periodic position updates
   cluster->position_update_task.handler = cover_position_update_handler;
   cluster->position_update_task.arg = cluster;
   hal_tasks_init(&cluster->position_update_task);
-  hal_tasks_schedule(&cluster->position_update_task, 1000); // Every 1 second
-
+  cover_schedule_next_position_update(cluster);
+  
   // Notify moving state changed
   hal_zigbee_notify_attribute_changed(cluster->endpoint,
                                      ZCL_CLUSTER_WINDOW_COVERING,
@@ -491,12 +502,14 @@ void cover_complete_calibration(zigbee_cover_cluster *cluster) {
   printf("Calibration saved: %u units (%u.%u seconds)\r\n", measured_time,
          measured_time / 10, measured_time % 10);
 
-  // Set position to endpoint based on direction
+  // Set motor position to endpoint based on calibration direction
   if (cluster->calibration_direction ==
       ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
-    cluster->position = 100; // Fully open
+    cluster->motor_position_bp = 10000;  // Fully open = 100.00%
+    cluster->position = 100;
   } else {
-    cluster->position = 0; // Fully closed
+    cluster->motor_position_bp = 0;  // Fully closed = 0.00%
+    cluster->position = 0;
   }
 
   // Exit calibration mode
@@ -551,49 +564,57 @@ void cover_calibration_timeout_handler(void *arg) {
 // ============================================================================
 
 void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
-  // Store reversal (1 byte) + calibration_time (2 bytes) + open_delay (2
-  // bytes) + close_delay (2 bytes) = 7 bytes
-  uint8_t data[7];
+  // Store: reversal (1) + calibration_time (2) + closed_slack (2) + 
+  //        open_slack (2) + motor_position_bp (2) = 9 bytes
+  uint8_t data[9];
   data[0] = cluster->reversal;
   data[1] = cluster->calibration_time & 0xFF;
   data[2] = (cluster->calibration_time >> 8) & 0xFF;
-  data[3] = cluster->open_delay & 0xFF;
-  data[4] = (cluster->open_delay >> 8) & 0xFF;
-  data[5] = cluster->close_delay & 0xFF;
-  data[6] = (cluster->close_delay >> 8) & 0xFF;
+  data[3] = cluster->closed_slack & 0xFF;
+  data[4] = (cluster->closed_slack >> 8) & 0xFF;
+  data[5] = cluster->open_slack & 0xFF;
+  data[6] = (cluster->open_slack >> 8) & 0xFF;
+  data[7] = cluster->motor_position_bp & 0xFF;
+  data[8] = (cluster->motor_position_bp >> 8) & 0xFF;
 
-  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx, 7, data);
-  printf("Config saved to NVM: calib_time=%u (%u.%us)\r\n",
+  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->output_idx, 9, data);
+  printf("Config saved to NVM: calib_time=%u (%u.%us), motor_pos=%u.%02u%%\r\n",
          cluster->calibration_time, cluster->calibration_time / 10,
-         cluster->calibration_time % 10);
+         cluster->calibration_time % 10,
+         cluster->motor_position_bp / 100, cluster->motor_position_bp % 100);
 }
 
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
-  uint8_t data[7];
+  uint8_t data[9];
   uint8_t read_status =
-      hal_nvm_read(NVM_COVER_0_CONFIG + cluster->output_idx, 7, data);
+      hal_nvm_read(NVM_COVER_0_CONFIG + cluster->output_idx, 9, data);
   if (read_status != 0) {
     // Default values (all timing values are in 100ms units)
     cluster->reversal = 0;         // No reversal
     cluster->calibration_time = 0; // Not calibrated
-    cluster->open_delay = 0;       // No delay
-    cluster->close_delay = 0;      // No delay
+    cluster->closed_slack = 0;     // No slack
+    cluster->open_slack = 0;       // No slack
+    cluster->motor_position_bp = 0; // Fully closed = 0.00%
   } else {
     cluster->reversal = data[0];
     cluster->calibration_time = data[1] | (data[2] << 8);
-    cluster->open_delay = data[3] | (data[4] << 8);
-    cluster->close_delay = data[5] | (data[6] << 8);
-    printf("Config loaded from NVM: calib_time=%u (%u.%us)\r\n",
+    cluster->closed_slack = data[3] | (data[4] << 8);
+    cluster->open_slack = data[5] | (data[6] << 8);
+    cluster->motor_position_bp = data[7] | (data[8] << 8);
+    printf("Config loaded from NVM: calib_time=%u (%u.%us), motor_pos=%u.%02u%%\r\n",
            cluster->calibration_time, cluster->calibration_time / 10,
-           cluster->calibration_time % 10);
+           cluster->calibration_time % 10,
+           cluster->motor_position_bp / 100, cluster->motor_position_bp % 100);
   }
+
+  // Calculate cover position from motor position
+  cluster->position = motor_to_cover_position(cluster);
 
   // Initialize runtime state
   cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
   cluster->calibration = 0;
   cluster->movement_start_time = 0;
-  cluster->start_position = 0;
-  cluster->target_position = 0;
+  cluster->start_motor_position_bp = 0;
   cluster->calibration_direction = 0;
 
   // Initialize tasks
@@ -611,8 +632,8 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
   switch (attribute_id) {
   case ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL:
   case ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME:
-  case ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY:
-  case ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY:
+  case ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK:
+  case ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK:
     cover_cluster_store_attrs_to_nv(cluster);
     // Send unsolicited reports for these config changes
     if (attribute_id == ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL) {
@@ -625,16 +646,16 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
           cluster->endpoint, ZCL_CLUSTER_WINDOW_COVERING,
           ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME, ZCL_DATA_TYPE_UINT16,
           &cluster->calibration_time, 2);
-    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY) {
+    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK) {
       hal_zigbee_send_report_attr(cluster->endpoint,
                                   ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY,
-                                  ZCL_DATA_TYPE_UINT16, &cluster->open_delay, 2);
-    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY) {
+                                  ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
+                                  ZCL_DATA_TYPE_UINT16, &cluster->closed_slack, 2);
+    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK) {
       hal_zigbee_send_report_attr(cluster->endpoint,
                                   ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY,
-                                  ZCL_DATA_TYPE_UINT16, &cluster->close_delay,
+                                  ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
+                                  ZCL_DATA_TYPE_UINT16, &cluster->open_slack,
                                   2);
     }
     break;
@@ -694,10 +715,10 @@ void cover_cluster_add_to_endpoint(zigbee_cover_cluster *cluster,
              ATTR_WRITABLE, cluster->calibration);
   SETUP_ATTR(5, ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME, ZCL_DATA_TYPE_UINT16,
              ATTR_WRITABLE, cluster->calibration_time);
-  SETUP_ATTR(6, ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY, ZCL_DATA_TYPE_UINT16,
-             ATTR_WRITABLE, cluster->open_delay);
-  SETUP_ATTR(7, ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY, ZCL_DATA_TYPE_UINT16,
-             ATTR_WRITABLE, cluster->close_delay);
+  SETUP_ATTR(6, ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK, ZCL_DATA_TYPE_UINT16,
+             ATTR_WRITABLE, cluster->closed_slack);
+  SETUP_ATTR(7, ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK, ZCL_DATA_TYPE_UINT16,
+             ATTR_WRITABLE, cluster->open_slack);
 
   endpoint->clusters[endpoint->cluster_count].cluster_id =
       ZCL_CLUSTER_WINDOW_COVERING;

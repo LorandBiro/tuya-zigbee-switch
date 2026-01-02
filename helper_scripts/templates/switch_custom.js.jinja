@@ -278,7 +278,7 @@ const romasku = {
             description: "Total travel time between end positions (0.1s precision)",
             entity_category: "config",
         }),
-    coverOpenDelay: (name, endpointName) =>
+    coverClosedSlack: (name, endpointName) =>
         numeric({
             name,
             endpointName,
@@ -289,10 +289,10 @@ const romasku = {
             unit: "s",
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff0a, type: 0x21 }, // uint16
-            description: "Delay before opening starts from closed position (0.1s precision)",
+            description: "Mechanical slack at closed position (0%) in seconds (0.1s precision)",
             entity_category: "config",
         }),
-    coverCloseDelay: (name, endpointName) =>
+    coverOpenSlack: (name, endpointName) =>
         numeric({
             name,
             endpointName,
@@ -303,7 +303,7 @@ const romasku = {
             unit: "s",
             cluster: "closuresWindowCovering",
             attribute: { ID: 0xff0b, type: 0x21 }, // uint16
-            description: "Delay before closing starts from open position (0.1s precision)",
+            description: "Mechanical slack at open position (100%) in seconds (0.1s precision)",
             entity_category: "config",
         }),
     coverSwitchOutputIndex: (name, endpointName, output_cnt) =>
@@ -421,8 +421,8 @@ const definitions = [
             romasku.coverMotorReversal("motor_reversal", "{{outputName}}"),
             romasku.coverCalibration("calibration", "{{outputName}}"),
             romasku.coverCalibrationTime("calibration_time", "{{outputName}}"),
-            romasku.coverOpenDelay("open_delay", "{{outputName}}"),
-            romasku.coverCloseDelay("close_delay", "{{outputName}}"),
+            romasku.coverClosedSlack("closed_slack", "{{outputName}}"),
+            romasku.coverOpenSlack("open_slack", "{{outputName}}"),
             {% endfor %}
             {% for inputName in device.coverSwitchNames %}
             romasku.coverSwitchType("switch_type", "{{inputName}}"),

@@ -84,8 +84,8 @@
 #define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL                     0xff07
 #define ZCL_ATTR_WINDOW_COVERING_CALIBRATION                        0xff08
 #define ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME                   0xff09
-#define ZCL_ATTR_WINDOW_COVERING_OPEN_DELAY                         0xff0a
-#define ZCL_ATTR_WINDOW_COVERING_CLOSE_DELAY                        0xff0b
+#define ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK                       0xff0a
+#define ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK                         0xff0b
 
 // Cover Switch Configuration cluster
 #define ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE       0x0000
