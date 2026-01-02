@@ -102,10 +102,8 @@ void hal_zigbee_init(hal_zigbee_endpoint *endpoints, uint8_t endpoints_cnt) {
       }
 
       if (clusters[j].cmd_callback) {
-        // Auto-detect manufacturer-specific clusters (>= 0xFC00) and use Tuya manufacturer code
-        uint16_t mfg_code = (clusters[j].cluster_id >= 0xFC00) ? 0x125D : 0xFFFF;
         sl_zigbee_subscribe_to_zcl_commands(
-            clusters[j].cluster_id, mfg_code,
+            clusters[j].cluster_id, 0xFFFF,
             clusters[j].is_server ? ZCL_DIRECTION_CLIENT_TO_SERVER
                                   : ZCL_DIRECTION_SERVER_TO_CLIENT,
             on_command_callback);
