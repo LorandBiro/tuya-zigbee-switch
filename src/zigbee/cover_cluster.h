@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 typedef struct {
-  uint8_t reversal;
+  uint8_t motor_reversal;
   uint16_t calibration_time;
   uint16_t closed_slack;
   uint16_t open_slack;
@@ -25,7 +25,7 @@ typedef struct {
   uint8_t window_covering_type;
   uint8_t position;
   uint8_t moving;
-  uint8_t reversal;
+  uint8_t motor_reversal;
   uint8_t calibration;
   uint16_t calibration_time;
   uint16_t closed_slack;

@@ -378,7 +378,7 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
   }
   
   // Setup motor
-  uint8_t reversed = cluster->reversal;
+  uint8_t reversed = cluster->motor_reversal;
   relay_t *open_relay = reversed ? cluster->close_relay : cluster->open_relay;
   relay_t *close_relay = reversed ? cluster->open_relay : cluster->close_relay;
   
@@ -434,7 +434,7 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
 
 void cover_start_calibration_movement(zigbee_cover_cluster *cluster,
                                       uint8_t direction) {
-  uint8_t reversed = cluster->reversal;
+  uint8_t reversed = cluster->motor_reversal;
   relay_t *open_relay = reversed ? cluster->close_relay : cluster->open_relay;
   relay_t *close_relay = reversed ? cluster->open_relay : cluster->close_relay;
 
@@ -577,7 +577,7 @@ void cover_calibration_timeout_handler(void *arg) {
 static zigbee_cover_cluster_config nv_config_buffer;
 
 void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
-  nv_config_buffer.reversal = cluster->reversal;
+  nv_config_buffer.motor_reversal = cluster->motor_reversal;
   nv_config_buffer.calibration_time = cluster->calibration_time;
   nv_config_buffer.closed_slack = cluster->closed_slack;
   nv_config_buffer.open_slack = cluster->open_slack;
@@ -603,7 +603,7 @@ void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
     return;
   }
 
-  cluster->reversal = nv_config_buffer.reversal;
+  cluster->motor_reversal = nv_config_buffer.motor_reversal;
   cluster->calibration_time = nv_config_buffer.calibration_time;
   cluster->closed_slack = nv_config_buffer.closed_slack;
   cluster->open_slack = nv_config_buffer.open_slack;
@@ -616,7 +616,7 @@ void cover_cluster_init(zigbee_cover_cluster *cluster) {
   cluster->window_covering_type = 0;
   cluster->position = 50; // 50%
   cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
-  cluster->reversal = 0;
+  cluster->motor_reversal = 0;
   cluster->calibration = 0;
   cluster->calibration_time = 300;
   cluster->closed_slack = 0;
@@ -649,7 +649,7 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
       hal_zigbee_send_report_attr(cluster->endpoint,
                                   ZCL_CLUSTER_WINDOW_COVERING,
                                   ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
-                                  ZCL_DATA_TYPE_BOOLEAN, &cluster->reversal, 1);
+                                  ZCL_DATA_TYPE_BOOLEAN, &cluster->motor_reversal, 1);
     } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME) {
       hal_zigbee_send_report_attr(
           cluster->endpoint, ZCL_CLUSTER_WINDOW_COVERING,
@@ -718,7 +718,7 @@ void cover_cluster_add_to_endpoint(zigbee_cover_cluster *cluster,
   SETUP_ATTR(1, ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE,
              ZCL_DATA_TYPE_UINT8, ATTR_READONLY, cluster->position);
   SETUP_ATTR(2, ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL, ZCL_DATA_TYPE_BOOLEAN,
-             ATTR_WRITABLE, cluster->reversal);
+             ATTR_WRITABLE, cluster->motor_reversal);
   SETUP_ATTR(3, ZCL_ATTR_WINDOW_COVERING_MOVING, ZCL_DATA_TYPE_ENUM8,
              ATTR_READONLY, cluster->moving);
   SETUP_ATTR(4, ZCL_ATTR_WINDOW_COVERING_CALIBRATION, ZCL_DATA_TYPE_BOOLEAN,
