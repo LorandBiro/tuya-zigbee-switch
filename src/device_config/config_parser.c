@@ -52,10 +52,10 @@ uint8_t switch_clusters_cnt = 0;
 zigbee_relay_cluster relay_clusters[4];
 uint8_t relay_clusters_cnt = 0;
 
-zigbee_cover_switch_cluster cover_switch_clusters[4];
+zigbee_cover_switch_cluster cover_switch_clusters[3];
 uint8_t cover_switch_clusters_cnt = 0;
 
-zigbee_cover_cluster cover_clusters[4];
+zigbee_cover_cluster cover_clusters[3];
 uint8_t cover_clusters_cnt = 0;
 
 hal_zigbee_cluster clusters[32];

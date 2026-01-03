@@ -583,7 +583,7 @@ void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
   nv_config_buffer.open_slack = cluster->open_slack;
   nv_config_buffer.motor_position_bp = cluster->motor_position_bp;
 
-  hal_nvm_write(NVM_COVER_0_CONFIG + cluster->cover_idx,
+  hal_nvm_write(NV_ITEM_COVER_CONFIG(cluster->cover_idx),
                 sizeof(zigbee_cover_cluster_config),
                 (uint8_t *)&nv_config_buffer);
   printf("Config saved to NVM: calib_time=%u (%u.%us), motor_pos=%u.%02u%%\r\n",
@@ -594,7 +594,7 @@ void cover_cluster_store_attrs_to_nv(zigbee_cover_cluster *cluster) {
 
 void cover_cluster_load_attrs_from_nv(zigbee_cover_cluster *cluster) {
   hal_nvm_status_t st = hal_nvm_read(
-      NVM_COVER_0_CONFIG + cluster->cover_idx,
+      NV_ITEM_COVER_CONFIG(cluster->cover_idx),
       sizeof(zigbee_cover_cluster_config),
       (uint8_t *)&nv_config_buffer);
 

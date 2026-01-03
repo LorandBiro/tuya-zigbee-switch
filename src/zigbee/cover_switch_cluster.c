@@ -246,13 +246,13 @@ void cover_switch_cluster_store_attrs_to_nv(zigbee_cover_switch_cluster *cluster
   data[3] = cluster->binded_mode;
   data[4] = cluster->switch_type;
   
-  hal_nvm_write(NVM_COVER_SWITCH_0_CONFIG + cluster->input_idx, 5, data);
+  hal_nvm_write(NV_ITEM_COVER_SWITCH_CONFIG(cluster->input_idx), 5, data);
 }
 
 void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluster) {
   uint8_t data[5];
   uint8_t read_status = hal_nvm_read(
-      NVM_COVER_SWITCH_0_CONFIG + cluster->input_idx, 5, data);
+      NV_ITEM_COVER_SWITCH_CONFIG(cluster->input_idx), 5, data);
   if (read_status != 0) {
     // Default values
     cluster->output_index = cluster->input_idx + 1;  // Default to same index + 1
