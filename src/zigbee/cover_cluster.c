@@ -771,8 +771,8 @@ hal_zigbee_cmd_result_t cover_cluster_callback(zigbee_cover_cluster *cluster,
       printf("Go-to-percentage command: %d%%\r\n", target_percentage);
       cover_goto_position(cluster, target_percentage);
     } else {
-      printf("ERROR: Go-to-percentage command with NULL payload\r\n");
-      return HAL_ZIGBEE_CMD_SKIPPED;
+      printf("Go-to-percentage called without payload\r\n");
+      cover_goto_position(cluster, 0);
     }
     break;
   default:
