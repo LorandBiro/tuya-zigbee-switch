@@ -365,8 +365,6 @@ const romasku = {
 
 const definitions = [
 {% for device in devices %}
-{% if device.device_type == "cover" %}
-    // Cover device
     {
         zigbeeModel: [
         {% for zb_model in device.zb_models %}
@@ -375,8 +373,9 @@ const definitions = [
         ],
         model: "{{device.model}}",
         vendor: "Tuya-custom",
-                description: "Custom cover controller (https://github.com/romasku/tuya-zigbee-switch)",
+        description: "Custom {% if device.coverNames %}cover{% endif %}{% if device.coverNames and (device.switchNames or device.relayNames) %}/{% endif %}{% if device.switchNames or device.relayNames %}switch{% endif %} (https://github.com/romasku/tuya-zigbee-switch)",
         extend: [
+            {% if device.coverSwitchNames %}
             deviceAddCustomCluster("manuSpecificTuyaCoverSwitchConfig", {
                 ID: 0xFC01,
                 manufacturerCode: 0x125D,
@@ -391,6 +390,8 @@ const definitions = [
                 commands: {},
                 commandsResponse: {},
             }),
+            {% endif %}
+            {% if device.coverNames %}
             deviceAddCustomCluster("closuresWindowCovering", {
                 ID: 0x0102,
                 manufacturerCode: 0x125D,
@@ -405,20 +406,33 @@ const definitions = [
                 commands: {},
                 commandsResponse: {},
             }),
+            {% endif %}
             deviceEndpoints({ endpoints: {
+                {%- for switchName in device.switchNames -%}
+                    "{{switchName}}": {{loop.index}},{{" "}}
+                {%- endfor -%}
                 {%- for inputName in device.coverSwitchNames -%}
-                    "{{inputName}}": {{loop.index}},{{" "}}
+                    "{{inputName}}": {{loop.index + (device.switchNames | length)}},{{" "}}
+                {%- endfor -%}
+                {%- for relayName in device.relayNames -%}
+                    "{{relayName}}": {{loop.index + (device.switchNames | length) + (device.coverSwitchNames | length)}},{{" "}}
                 {%- endfor -%}
                 {%- for outputName in device.coverNames -%}
-                    "{{outputName}}": {{loop.index + (device.coverSwitchNames | length)}},{{" "}}
+                    "{{outputName}}": {{loop.index + (device.switchNames | length) + (device.coverSwitchNames | length) + (device.relayNames | length)}},{{" "}}
                 {%- endfor -%}
             } }),
-            romasku.deviceConfig("device_config", "{{device.coverSwitchNames[0]}}"),
+            {% set first_endpoint = device.switchNames[0] if device.switchNames else (device.coverSwitchNames[0] if device.coverSwitchNames else (device.relayNames[0] if device.relayNames else device.coverNames[0])) %}
+            romasku.deviceConfig("device_config", "{{first_endpoint}}"),
             {% if device.has_dedicated_net_led %}
-            romasku.networkIndicator("network_led", "{{device.coverSwitchNames[0]}}"),
+            romasku.networkIndicator("network_led", "{{first_endpoint}}"),
             {% endif %}
             
-            // Controls & Sensors
+            {% if device.relayNames %}
+            // Relay controls
+            onOff({ endpointNames: {{device.relayNames | tojson }} }),
+            {% endif %}
+            {% if device.coverNames %}
+            // Cover controls & sensors
             {% for outputName in device.coverNames %}
             windowCovering({ 
                 controls: ["lift"],
@@ -433,41 +447,9 @@ const definitions = [
             romasku.coverOpenSlack("open_slack", "{{outputName}}"),
             romasku.coverMotorReversal("motor_reversal", "{{outputName}}"),
             {% endfor %}
-            {% for inputName in device.coverSwitchNames %}
-            romasku.coverSwitchAction("switch_action", "{{inputName}}"),
-            romasku.coverSwitchType("switch_type", "{{inputName}}"),
-            romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
-            romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
-            romasku.coverSwitchLocalMode("local_mode", "{{inputName}}"),
-            romasku.coverSwitchBindedMode("binded_mode", "{{inputName}}"),
-            romasku.coverSwitchLongPressDuration("long_press_duration", "{{inputName}}"),
-            {% endfor %}
-        ],
-{% else %}
-    // Switch/relay device
-    {
-        zigbeeModel: [
-        {% for zb_model in device.zb_models %}
-            "{{zb_model}}",
-        {% endfor %}
-        ],
-        model: "{{device.model}}",
-        vendor: "Tuya-custom",
-        description: "Custom switch (https://github.com/romasku/tuya-zigbee-switch)",
-        extend: [
-            deviceEndpoints({ endpoints: {
-                {%- for switchName in device.switchNames -%}
-                    "{{switchName}}": {{loop.index}},{{" "}}
-                {%- endfor -%}
-                {%- for relayName in device.relayNames -%}
-                    "{{relayName}}": {{loop.index  + (device.switchNames | length)}},{{" "}}
-                {%- endfor -%}
-            } }),
-            romasku.deviceConfig("device_config", "{{device.switchNames[0]}}"),
-            {% if device.has_dedicated_net_led %}
-            romasku.networkIndicator("network_led", "{{device.switchNames[0]}}"),
-            {% endif%}
-            onOff({ endpointNames: {{device.relayNames | tojson }} }),
+            {% endif %}
+            {% if device.switchNames %}
+            // Switch inputs
             {% for switchName in device.switchNames %}
             romasku.pressAction("{{switchName}}_press_action", "{{switchName}}"),
             romasku.switchMode("{{switchName}}_mode", "{{switchName}}"),
@@ -478,48 +460,35 @@ const definitions = [
             romasku.longPressDuration("{{switchName}}_long_press_duration", "{{switchName}}"),
             romasku.levelMoveRate("{{switchName}}_level_move_rate", "{{switchName}}"),
             {% endfor %}
+            {% endif %}
+            {% if device.coverSwitchNames %}
+            // Cover switch inputs
+            {% for inputName in device.coverSwitchNames %}
+            romasku.coverSwitchAction("switch_action", "{{inputName}}"),
+            romasku.coverSwitchType("switch_type", "{{inputName}}"),
+            romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
+            romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
+            romasku.coverSwitchLocalMode("local_mode", "{{inputName}}"),
+            romasku.coverSwitchBindedMode("binded_mode", "{{inputName}}"),
+            romasku.coverSwitchLongPressDuration("long_press_duration", "{{inputName}}"),
+            {% endfor %}
+            {% endif %}
+            {% if device.relayIndicatorNames %}
+            // Relay indicator LEDs
             {% for relayName in device.relayIndicatorNames %}
             romasku.relayIndicatorMode("{{relayName}}_indicator_mode", "{{relayName}}"),
             romasku.relayIndicator("{{relayName}}_indicator", "{{relayName}}"),
             {% endfor %}
+            {% endif %}
         ],
-{% endif %}
         meta: { multiEndpoint: true },
         configure: async (device, coordinatorEndpoint, logger) => {
-{% if device.device_type == "cover" %}
-            // Cover switch endpoints - button state reporting
-            {% for inputName in device.coverSwitchNames %}
-            const input{{loop.index}} = device.getEndpoint({{loop.index}});
-            await reporting.bind(input{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
-            await input{{loop.index}}.configureReporting("genMultistateInput", [
-                {
-                    attribute: "presentValue",
-                    minimumReportInterval: 0,
-                    maximumReportInterval: constants.repInterval.MAX,
-                    reportableChange: 1,
-                },
-            ]);
-            {% endfor %}
-            // Cover endpoints - motor state and position reporting
-            {% for outputName in device.coverNames %}
-            const output{{loop.index}} = device.getEndpoint({{loop.index + (device.coverSwitchNames | length)}});
-            await reporting.bind(output{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
-            await output{{loop.index}}.configureReporting("closuresWindowCovering", [
-                {
-                    attribute: "moving",
-                    minimumReportInterval: 0,
-                    maximumReportInterval: constants.repInterval.MAX,
-                    reportableChange: 1,
-                },
-            ]);
-            {% endfor %}
-{% else %}
-            // Switch endpoints
+            {% if device.switchNames %}
+            // Switch endpoints - button state reporting
             {% for switchName in device.switchNames %}
-            const endpoint{{loop.index}} = device.getEndpoint({{loop.index}});
-            await reporting.bind(endpoint{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
-            // switch action:
-            await endpoint{{loop.index}}.configureReporting("genMultistateInput", [
+            const switch{{loop.index}} = device.getEndpoint({{loop.index}});
+            await reporting.bind(switch{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
+            await switch{{loop.index}}.configureReporting("genMultistateInput", [
                 {
                     attribute: {ID: 0x0055 /* presentValue */, type: 0x21}, // uint16
                     minimumReportInterval: 0,
@@ -528,18 +497,38 @@ const definitions = [
                 },
             ]);
             {% endfor %}
-            // Relay endpoints
+            {% endif %}
+            {% if device.coverSwitchNames %}
+            // Cover switch endpoints - button state reporting
+            {% for inputName in device.coverSwitchNames %}
+            const coverSwitch{{loop.index}} = device.getEndpoint({{loop.index + (device.switchNames | length)}});
+            await reporting.bind(coverSwitch{{loop.index}}, coordinatorEndpoint, ["genMultistateInput"]);
+            await coverSwitch{{loop.index}}.configureReporting("genMultistateInput", [
+                {
+                    attribute: "presentValue",
+                    minimumReportInterval: 0,
+                    maximumReportInterval: constants.repInterval.MAX,
+                    reportableChange: 1,
+                },
+            ]);
+            {% endfor %}
+            {% endif %}
+            {% if device.relayNames %}
+            // Relay endpoints - on/off state reporting
             {% for relayName in device.relayNames %}
-            const endpoint{{loop.index  + (device.switchNames | length)}} = device.getEndpoint({{loop.index  + (device.switchNames | length)}});
-            await reporting.onOff(endpoint{{loop.index  + (device.switchNames | length)}}, {
+            const relay{{loop.index}} = device.getEndpoint({{loop.index + (device.switchNames | length) + (device.coverSwitchNames | length)}});
+            await reporting.onOff(relay{{loop.index}}, {
                 min: 0,
                 max: constants.repInterval.MAX,
                 change: 1,
             });
             {% endfor %}
+            {% endif %}
+            {% if device.relayIndicatorNames %}
             // Relay indicator LEDs
             {% for relayName in device.relayIndicatorNames %}
-            await endpoint{{loop.index  + (device.switchNames | length)}}.configureReporting("genOnOff", [
+            const relayInd{{loop.index}} = device.getEndpoint({{loop.index + (device.switchNames | length) + (device.coverSwitchNames | length)}});
+            await relayInd{{loop.index}}.configureReporting("genOnOff", [
                 {
                     attribute: {ID: 0xff02, type: 0x10}, // Boolean
                     minimumReportInterval: 0,
@@ -548,7 +537,22 @@ const definitions = [
                 },
             ]);
             {% endfor %}
-{% endif %}
+            {% endif %}
+            {% if device.coverNames %}
+            // Cover endpoints - motor state and position reporting
+            {% for outputName in device.coverNames %}
+            const cover{{loop.index}} = device.getEndpoint({{loop.index + (device.switchNames | length) + (device.coverSwitchNames | length) + (device.relayNames | length)}});
+            await reporting.bind(cover{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
+            await cover{{loop.index}}.configureReporting("closuresWindowCovering", [
+                {
+                    attribute: "moving",
+                    minimumReportInterval: 0,
+                    maximumReportInterval: constants.repInterval.MAX,
+                    reportableChange: 1,
+                },
+            ]);
+            {% endfor %}
+            {% endif %}
         },
         {% if z2m_v1 %}
         ota: ota.zigbeeOTA,

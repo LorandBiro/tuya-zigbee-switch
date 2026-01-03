@@ -2812,7 +2812,7 @@ ZBMINIL2:
   - https://sonoff.tech/products/sonoff-zbmini-extreme-zigbee-smart-switch-zbminil2
 GIRIER_TS130F_DUAL:
   human_name: Girier TS130F Dual Curtain Controller
-  category: cover
+  category: module
   power: mains
   neutral: required
   device_type: router
