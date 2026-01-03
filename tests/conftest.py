@@ -191,8 +191,11 @@ class Device:
         assert res.ok
         return res.payload
 
-    def call_zigbee_cmd(self, endpoint: int, cluster: int, cmd: int) -> dict[str, str]:
-        res = self.p.exec(f"zcl_cmd {endpoint} 0x{cluster:04X} 0x{cmd:02X}")
+    def call_zigbee_cmd(self, endpoint: int, cluster: int, cmd: int, payload: bytes = None) -> dict[str, str]:
+        if payload is not None:
+            res = self.p.exec(f"zcl_cmd {endpoint} 0x{cluster:04X} 0x{cmd:02X} {payload.hex()}")
+        else:
+            res = self.p.exec(f"zcl_cmd {endpoint} 0x{cluster:04X} 0x{cmd:02X}")
         assert res.ok
         return res.payload
 

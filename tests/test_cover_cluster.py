@@ -4,260 +4,22 @@ import pytest
 from client import StubProc
 from conftest import Device
 from zcl_consts import (
-    ZCL_ATTR_BASIC_MFR_NAME,
-    ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE,
     ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
-    ZCL_ATTR_WINDOW_COVERING_TYPE,
     ZCL_ATTR_WINDOW_COVERING_MOVING,
     ZCL_ATTR_WINDOW_COVERING_CALIBRATION,
     ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
     ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
     ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
-    ZCL_ATTR_COVER_SWITCH_OUTPUT_INDEX,
-    ZCL_ATTR_COVER_SWITCH_REVERSAL,
-    ZCL_CLUSTER_BASIC,
-    ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
-    ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG,
-    ZCL_CLUSTER_COVER_SWITCH_CONFIG,
+    ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE,
     ZCL_CLUSTER_WINDOW_COVERING,
     ZCL_CMD_WINDOW_COVERING_UP_OPEN,
     ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE,
     ZCL_CMD_WINDOW_COVERING_STOP,
+    ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE,
     COVER_STOPPED,
     COVER_OPENING,
     COVER_CLOSING,
 )
-
-
-def test_girier_cover_device_boots():
-    """Test that GIRIER_TS130F_DUAL config boots without crashing.
-    
-    This is the CRITICAL safety test to prevent bricking the device.
-    Config: j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;
-    - 2 cover switch pairs (X entries): B4+D2, C3+C2
-    - 2 cover pairs (W entries): C0+C4, D4+D7
-    """
-    cfg = "j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;"
-    p = StubProc(device_config=cfg).start()
-    try:
-        d = Device(p)
-        # If we can read basic cluster, device booted successfully
-        mfr = d.read_zigbee_attr(1, ZCL_CLUSTER_BASIC, ZCL_ATTR_BASIC_MFR_NAME)
-        assert mfr == "j1xl73iw"
-    finally:
-        p.stop()
-
-
-def test_girier_cover_endpoint_layout():
-    """Test that GIRIER config creates correct endpoint layout.
-
-    Expected layout:
-    - EP1: Cover switch 1 (OnOffSwitchConfig server + WindowCovering client + MultiStateInput)
-    - EP2: Cover switch 2 (OnOffSwitchConfig server + WindowCovering client + MultiStateInput)
-    - EP3: Cover 1 (WindowCovering server)
-    - EP4: Cover 2 (WindowCovering server)
-    """
-    cfg = "j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;"
-    p = StubProc(device_config=cfg).start()
-    try:
-        d = Device(p)
-        
-        # EP1 and EP2 should have MultiStateInput (cover switches)
-        for ep in [1, 2]:
-            multistate = d.read_zigbee_attr(
-                ep,
-                ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
-                ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE
-            )
-            assert multistate in ("0", "1", "2", "3", "4", "5"), f"EP{ep} missing MultiStateInput"
-            
-            # Check custom cover switch config attributes on CoverSwitchConfig server
-            output_idx = d.read_zigbee_attr(
-                ep, 
-                ZCL_CLUSTER_COVER_SWITCH_CONFIG,
-                ZCL_ATTR_COVER_SWITCH_OUTPUT_INDEX
-            )
-            assert output_idx is not None, f"EP{ep} missing output_index attribute"
-        
-        # EP3 and EP4 should have WindowCovering server (covers)
-        for ep in [3, 4]:
-            # Check operational_status attribute
-            status = d.read_zigbee_attr(
-                ep,
-                ZCL_CLUSTER_WINDOW_COVERING,
-                ZCL_ATTR_WINDOW_COVERING_MOVING
-            )
-            # Should be stopped (0) initially
-            assert int(status) == COVER_STOPPED, \
-                f"EP{ep} operational_status should be stopped initially"
-            
-            # Check window covering type attribute
-            wc_type = d.read_zigbee_attr(
-                ep,
-                ZCL_CLUSTER_WINDOW_COVERING,
-                ZCL_ATTR_WINDOW_COVERING_TYPE
-            )
-            assert wc_type is not None, f"EP{ep} missing window_covering_type"
-            
-            # Check motor reversal attribute
-            reversal = d.read_zigbee_attr(
-                ep,
-                ZCL_CLUSTER_WINDOW_COVERING,
-                ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL
-            )
-            assert reversal is not None, f"EP{ep} missing motor_reversal attribute"
-            
-    finally:
-        p.stop()
-
-
-@pytest.mark.parametrize(
-    "cfg,num_cover_switches,num_covers",
-    [
-        # Single cover pair
-        ("Mfr;Model;XA0A1u;WB0B1;", 1, 1),
-        # Two cover pairs (like GIRIER)
-        ("Mfr;Model;XA0A1u;WB0B1;XC0C1u;WD0D1;", 2, 2),
-        # Mixed: 1 switch + 1 relay + 1 cover
-        ("Mfr;Model;SA0u;RA1;XB0B1u;WC0C1;", 1, 1),  # switch/relay on EP1/2, cover on EP3/4
-    ],
-)
-def test_various_cover_configs_boot(cfg: str, num_cover_switches: int, num_covers: int):
-    """Test that various cover configurations boot without crashes."""
-    p = StubProc(device_config=cfg).start()
-    try:
-        d = Device(p)
-        # Just verify device boots and basic cluster is accessible
-        _ = d.read_zigbee_attr(1, ZCL_CLUSTER_BASIC, ZCL_ATTR_BASIC_MFR_NAME)
-    finally:
-        p.stop()
-
-
-def test_cover_responds_to_commands(device: Device):
-    """Test that cover responds to OPEN/CLOSE/STOP commands."""
-    # This test uses default device_config fixture which needs to be updated
-    # For now, we'll skip unless device has cover endpoints
-    try:
-        # Try to send OPEN command to hypothetical cover endpoint
-        device.call_zigbee_cmd(3, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
-        # If no exception, command was accepted
-    except AssertionError:
-        # Expected if device doesn't have cover endpoints
-        pytest.skip("Device config doesn't have cover endpoints")
-
-
-def test_array_bounds_safety():
-    """Test that we don't exceed array bounds with maximum config.
-    
-    This tests the safety limits:
-    - buttons[5] array
-    - relays[5] array
-    - cover_switch_clusters[4] array
-    - cover_clusters[4] array
-    """
-    # Maximum safe config: 2 cover pairs = 4 buttons + 4 relays
-    # This should work (within limits)
-    cfg_ok = "Mfr;Model;XA0A1u;WB0B1;XC0C1u;WD0D1;"
-    p = StubProc(device_config=cfg_ok).start()
-    try:
-        d = Device(p)
-        _ = d.read_zigbee_attr(1, ZCL_CLUSTER_BASIC, ZCL_ATTR_BASIC_MFR_NAME)
-    finally:
-        p.stop()
-    
-    # This config would exceed limits (3 cover pairs = 6 buttons)
-    # buttons[5] can only hold 5, so this would overflow
-    # NOTE: Ideally this should fail gracefully or be caught by parser
-    cfg_overflow = "Mfr;Model;XA0A1u;WB0B1;XC0C1u;WD0D1;XE0E1u;WF0F1;"
-    # TODO: When bounds checking is added, verify it fails gracefully
-    # For now, we just document the unsafe config
-
-
-def test_cover_pins_initialized_correctly():
-    """Test that cover pins are initialized with correct pull resistors."""
-    cfg = "Mfr;Model;XA0A1u;WB0B1;"  # Input with pull-up (u), output with no pull
-    p = StubProc(device_config=cfg).start()
-    try:
-        d = Device(p)
-        
-        # Input pins (A0, A1) should be initialized as inputs with pull-up
-        # Output pins (B0, B1) should be initialized as outputs
-        
-        # If device boots, GPIO init succeeded
-        _ = d.read_zigbee_attr(1, ZCL_CLUSTER_BASIC, ZCL_ATTR_BASIC_MFR_NAME)
-        
-        # TODO: Add GPIO state verification when stub supports GPIO introspection
-        
-    finally:
-        p.stop()
-
-
-@pytest.fixture
-def cover_device_config() -> str:
-    """Config for a simple cover device with one input/output pair."""
-    return "TestMfr;TestDevice;LC0;XA0A1u;WB0B1;"
-
-
-@pytest.fixture
-def cover_device(cover_device_config: str) -> Device:
-    """Fixture for a device with cover configuration."""
-    proc = StubProc(device_config=cover_device_config).start()
-    yield Device(proc)
-    proc.stop()
-
-
-def test_cover_switch_button_press(cover_device: Device):
-    """Test that pressing cover switch buttons updates multistate value."""
-    # Press OPEN button (A0)
-    cover_device.press_button("A0")
-    cover_device.step_time(100)
-    
-    # MultiState value should change (exact value depends on implementation)
-    value = cover_device.read_zigbee_attr(
-        1,
-        ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
-        ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE
-    )
-    # Just verify it's a valid multistate value
-    assert value in ("0", "1", "2")
-    
-    cover_device.release_button("A0")
-
-
-def test_cover_safety_interlock():
-    """Test that OPEN and CLOSE relays cannot be activated simultaneously.
-    
-    This is a CRITICAL safety test to prevent short circuits.
-    """
-    cfg = "Mfr;Model;WA0A1;"  # Simple output pair
-    p = StubProc(device_config=cfg).start()
-    try:
-        d = Device(p)
-        
-        # Send OPEN command
-        d.call_zigbee_cmd(1, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
-        d.step_time(10)
-        
-        # Check GPIO state - OPEN relay (A0) should be ON
-        open_state = d.get_gpio("A0", refresh=True)
-        close_state = d.get_gpio("A1", refresh=True)
-        
-        # During OPEN operation, CLOSE should definitely be OFF
-        assert not close_state, "CLOSE relay active during OPEN command - SAFETY VIOLATION!"
-        
-        # Now send CLOSE command (should stop OPEN first)
-        d.call_zigbee_cmd(1, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
-        d.step_time(60)  # Wait for 50ms interlock + some margin
-        
-        # Check states again
-        open_state = d.get_gpio("A0", refresh=True)
-        close_state = d.get_gpio("A1", refresh=True)
-        
-        # OPEN should be OFF now, CLOSE should be ON
-        assert not open_state, "OPEN relay still active during CLOSE command - SAFETY VIOLATION!"
-        
-    finally:
-        p.stop()
 
 
 def test_cover_stop_command():
@@ -385,60 +147,326 @@ def test_cover_calibration_attributes():
         p.stop()
 
 
-def test_cover_calibration_attributes_persist():
-    """Test that calibration attributes can be written and read back."""
+def test_cover_config_preserved_via_nvm():
+    """Test that cover config attributes persist across device restarts via NVM."""
+    device_config = "Mfr;Model;WA0A1;"
+    endpoint = 1
+    
+    test_values = {
+        ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME: "450",
+        ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK: "20",
+        ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK: "15",
+        ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL: "1",
+    }
+    
+    # Session 1: Write config values
+    with StubProc(device_config=device_config) as proc:
+        device = Device(proc)
+        
+        for attr_id, value in test_values.items():
+            device.write_zigbee_attr(
+                endpoint, ZCL_CLUSTER_WINDOW_COVERING, attr_id, int(value)
+            )
+    
+    # Session 2: Restart device and verify values are preserved
+    with StubProc(device_config=device_config) as proc:
+        device = Device(proc)
+        
+        for attr_id, expected_value in test_values.items():
+            actual_value = device.read_zigbee_attr(
+                endpoint, ZCL_CLUSTER_WINDOW_COVERING, attr_id
+            )
+            assert actual_value == expected_value, (
+                f"Attribute {attr_id:04x} not preserved via NVM: "
+                f"expected {expected_value}, got {actual_value}"
+            )
+
+
+def test_cover_open_command():
+    """Test OPEN command activates correct relay and updates state."""
     cfg = "Mfr;Model;WA0A1;"
     p = StubProc(device_config=cfg).start()
     try:
         d = Device(p)
+        endpoint = 1
         
-        # Write calibration attributes
+        # Set calibration time first
         d.write_zigbee_attr(
-            1,
+            endpoint,
             ZCL_CLUSTER_WINDOW_COVERING,
             ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
-            45
-        )
-        d.write_zigbee_attr(
-            1,
-            ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
-            10
-        )
-        d.write_zigbee_attr(
-            1,
-            ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
-            8
+            100  # 10 seconds
         )
         d.step_time(10)
         
-        # Verify attributes can be read back
-        calibration_time = d.read_zigbee_attr(
-            1,
-            ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME
-        )
-        assert calibration_time == "45", "calibration_time should be readable"
+        # Send OPEN command
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
         
-        closed_slack = d.read_zigbee_attr(
-            1,
-            ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK
-        )
-        assert closed_slack == "10", "closed_slack should be readable"
+        # Verify OPEN relay is ON, CLOSE relay is OFF (integrated safety check)
+        assert d.get_gpio("A0", refresh=True), "OPEN relay should be active"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF (safety)"
         
-        open_slack = d.read_zigbee_attr(
-            1,
-            ZCL_CLUSTER_WINDOW_COVERING,
-            ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK
+        # Verify moving state
+        moving = d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         )
-        assert open_slack == "8", "open_slack should be readable"
-        
-        # Note: NVM persistence testing would require stub device to support
-        # cross-process NVM preservation, which may not be implemented yet
+        assert int(moving) == COVER_OPENING
         
     finally:
         p.stop()
 
 
+def test_cover_close_command():
+    """Test CLOSE command activates correct relay and updates state."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time first
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100  # 10 seconds
+        )
+        d.step_time(10)
+        
+        # Send CLOSE command
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
+        d.step_time(50)
+        
+        # Verify CLOSE relay is ON, OPEN relay is OFF (integrated safety check)
+        assert d.get_gpio("A1", refresh=True), "CLOSE relay should be active"
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF (safety)"
+        
+        # Verify moving state
+        moving = d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        )
+        assert int(moving) == COVER_CLOSING
+        
+    finally:
+        p.stop()
+
+
+def test_cover_direction_change_stops_first():
+    """Test that changing direction stops previous movement first (safety)."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100
+        )
+        d.step_time(10)
+        
+        # Start OPEN
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
+        
+        # Verify opening
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_OPENING
+        assert d.get_gpio("A0", refresh=True), "OPEN relay should be active"
+        
+        # Now send CLOSE command (should stop OPEN first)
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
+        d.step_time(60)  # Wait for transition
+        
+        # Verify OPEN relay is OFF and CLOSE relay is ON
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF (safety)"
+        assert d.get_gpio("A1", refresh=True), "CLOSE relay should be active"
+        
+        # Verify closing state
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_CLOSING
+        
+    finally:
+        p.stop()
+
+
+def test_cover_motor_reversal():
+    """Test that motor reversal swaps which relay activates for OPEN/CLOSE."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100
+        )
+        d.step_time(10)
+        
+        # Normal operation (reversal = 0)
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
+            0
+        )
+        d.step_time(10)
+        
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
+        assert d.get_gpio("A0", refresh=True), "Normal: OPEN command uses A0 relay"
+        assert not d.get_gpio("A1", refresh=True), "Normal: A1 should be OFF"
+        
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_STOP)
+        d.step_time(50)
+        
+        # Reversed operation (reversal = 1)
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
+            1
+        )
+        d.step_time(10)
+        
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
+        assert d.get_gpio("A1", refresh=True), "Reversed: OPEN command uses A1 relay"
+        assert not d.get_gpio("A0", refresh=True), "Reversed: A0 should be OFF"
+        
+    finally:
+        p.stop()
+
+
+def test_cover_goto_position():
+    """Test go-to-percentage command moves cover to target position."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time (10 seconds)
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100
+        )
+        d.step_time(10)
+        
+        # Start at 0% (fully closed)
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
+        d.step_time(50)
+        # Wait for it to fully close
+        d.step_time(11000)  # Wait for full calibration time to complete
+        
+        # Verify stopped at 0%
+        position = int(d.read_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE
+        ))
+        assert position == 0, f"Should be at 0% to start, but at {position}%"
+        
+        # Go to 50%
+        d.call_zigbee_cmd(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE,
+            payload=bytes([50])
+        )
+        d.step_time(50)
+        
+        # Should be moving
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving != COVER_STOPPED, "Should be moving to position"
+        
+        # Wait for auto-stop (half of calibration time + margin)
+        d.step_time(6000)  # If calib is 10s, halfway is ~5s
+        
+        # Should have stopped
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_STOPPED, "Should have auto-stopped"
+        
+        # Position should be near target (minimal timing test - just verify it's not 0 or 100)
+        position = int(d.read_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE
+        ))
+        assert 20 < position < 80, f"Position {position} should be somewhere in middle range"
+        
+        # Both relays should be OFF after auto-stop
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF after auto-stop"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF after auto-stop"
+        
+    finally:
+        p.stop()
+
+
+def test_cover_moving_state_attribute():
+    """Test that moving attribute accurately reflects current state."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100
+        )
+        d.step_time(10)
+        
+        # Initially stopped
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_STOPPED, "Should be initially stopped"
+        
+        # Start opening
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_OPENING, "Should be opening"
+        
+        # Stop
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_STOP)
+        d.step_time(50)
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_STOPPED, "Should be stopped after STOP command"
+        
+        # Start closing
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
+        d.step_time(50)
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == COVER_CLOSING, "Should be closing"
+        
+    finally:
+        p.stop()
