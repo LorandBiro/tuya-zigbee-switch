@@ -239,7 +239,7 @@ const romasku = {
                 closing: 2
             },
             cluster: "closuresWindowCovering",
-            attribute: {ID: 0xff06, type: Zcl.DataType.ENUM8},
+            attribute: "moving",
             description: "Cover movement status",
         }),
     coverMotorReversal: (name, endpointName) =>
@@ -395,12 +395,12 @@ const definitions = [
             deviceAddCustomCluster("closuresWindowCovering", {
                 ID: 0x0102,
                 attributes: {
-                    moving: {ID: 0xff06, type: Zcl.DataType.ENUM8, manufacturerCode: 0x125D},
-                    motorReversal: {ID: 0xff07, type: Zcl.DataType.BOOLEAN, manufacturerCode: 0x125D},
-                    calibration: {ID: 0xff08, type: Zcl.DataType.BOOLEAN, manufacturerCode: 0x125D},
-                    calibrationTime: {ID: 0xff09, type: Zcl.DataType.UINT16, manufacturerCode: 0x125D},
-                    closedSlack: {ID: 0xff0a, type: Zcl.DataType.UINT16, manufacturerCode: 0x125D},
-                    openSlack: {ID: 0xff0b, type: Zcl.DataType.UINT16, manufacturerCode: 0x125D},
+                    moving: {ID: 0xff06, type: Zcl.DataType.ENUM8},
+                    motorReversal: {ID: 0xff07, type: Zcl.DataType.BOOLEAN},
+                    calibration: {ID: 0xff08, type: Zcl.DataType.BOOLEAN},
+                    calibrationTime: {ID: 0xff09, type: Zcl.DataType.UINT16},
+                    closedSlack: {ID: 0xff0a, type: Zcl.DataType.UINT16},
+                    openSlack: {ID: 0xff0b, type: Zcl.DataType.UINT16},
                 },
                 commands: {},
                 commandsResponse: {},
