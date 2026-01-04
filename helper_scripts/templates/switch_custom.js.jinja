@@ -239,7 +239,7 @@ const romasku = {
                 closing: 2
             },
             cluster: "closuresWindowCovering",
-            attribute: "moving",
+            attribute: {ID: 0xff06, type: Zcl.DataType.ENUM8},
             description: "Cover movement status",
         }),
     coverMotorReversal: (name, endpointName) =>
