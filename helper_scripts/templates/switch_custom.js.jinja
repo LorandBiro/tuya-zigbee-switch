@@ -267,7 +267,7 @@ const romasku = {
     coverCalibrationTime: (name, endpointName) =>
         numeric({
             name,
-            endpointName,
+            endpointNames: [endpointName],
             valueMin: 0,
             valueMax: 300,
             valueStep: 0.1,
@@ -281,7 +281,7 @@ const romasku = {
     coverClosedSlack: (name, endpointName) =>
         numeric({
             name,
-            endpointName,
+            endpointNames: [endpointName],
             valueMin: 0,
             valueMax: 300,
             valueStep: 0.1,
@@ -295,7 +295,7 @@ const romasku = {
     coverOpenSlack: (name, endpointName) =>
         numeric({
             name,
-            endpointName,
+            endpointNames: [endpointName],
             valueMin: 0,
             valueMax: 300,
             valueStep: 0.1,
