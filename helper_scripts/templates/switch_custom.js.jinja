@@ -537,21 +537,6 @@ const definitions = [
             ]);
             {% endfor %}
             {% endif %}
-            {% if device.coverNames %}
-            // Cover endpoints - motor state and position reporting
-            {% for outputName in device.coverNames %}
-            const cover{{loop.index}} = device.getEndpoint({{loop.index + (device.switchNames | length) + (device.coverSwitchNames | length) + (device.relayNames | length)}});
-            await reporting.bind(cover{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
-            await cover{{loop.index}}.configureReporting("closuresWindowCovering", [
-                {
-                    attribute: "moving",
-                    minimumReportInterval: 0,
-                    maximumReportInterval: constants.repInterval.MAX,
-                    reportableChange: 1,
-                },
-            ]);
-            {% endfor %}
-            {% endif %}
         },
         {% if z2m_v1 %}
         ota: ota.zigbeeOTA,
