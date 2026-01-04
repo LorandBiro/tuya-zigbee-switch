@@ -11,9 +11,16 @@
 #include "cover_cluster.h"
 #include "zigbee_commands.h"
 
+#define MULTISTATE_RELEASED 0
+#define MULTISTATE_OPEN 1
+#define MULTISTATE_CLOSE 2
+#define MULTISTATE_STOP 3
+#define MULTISTATE_LONG_OPEN 4
+#define MULTISTATE_LONG_CLOSE 5
+
 static const uint8_t multistate_out_of_service = 0;
 static const uint8_t multistate_flags = 0;
-static const uint16_t multistate_num_of_states = 9;
+static const uint16_t multistate_num_of_states = 6;
 
 extern zigbee_basic_cluster basic_cluster;
 extern zigbee_cover_cluster cover_clusters[];
@@ -21,12 +28,9 @@ extern uint8_t cover_clusters_cnt;
 extern uint8_t switch_clusters_cnt;
 extern uint8_t relay_clusters_cnt;
 
-void cover_switch_cluster_on_open_button_press(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_open_button_release(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_open_button_long_press(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_close_button_press(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_close_button_release(zigbee_cover_switch_cluster *cluster);
-void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_button_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_button_release(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_button_long_press(zigbee_cover_switch_cluster *cluster);
 
 zigbee_cover_switch_cluster *cover_switch_cluster_by_endpoint[10];
 
@@ -38,7 +42,8 @@ void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluste
 void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
                                          uint16_t attribute_id);
 
-void cover_switch_cluster_report_action(zigbee_cover_switch_cluster *cluster);
+uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode);
+void cover_switch_cluster_update_present_value(zigbee_cover_switch_cluster *cluster, uint8_t value);
 void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t command);
 
 void cover_switch_cluster_callback_attr_write_trampoline(uint8_t endpoint,
@@ -54,20 +59,14 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
   cover_switch_cluster_init(cluster);
   cover_switch_cluster_load_attrs_from_nv(cluster);
 
-  cluster->open_button->on_press =
-      (ev_button_callback_t)cover_switch_cluster_on_open_button_press;
-  cluster->open_button->on_release =
-      (ev_button_callback_t)cover_switch_cluster_on_open_button_release;
-  cluster->open_button->on_long_press =
-      (ev_button_callback_t)cover_switch_cluster_on_open_button_long_press;
+  cluster->open_button->on_press = (ev_button_callback_t)cover_switch_cluster_on_button_press;
+  cluster->open_button->on_release = (ev_button_callback_t)cover_switch_cluster_on_button_release;
+  cluster->open_button->on_long_press = (ev_button_callback_t)cover_switch_cluster_on_button_long_press;
   cluster->open_button->callback_param = cluster;
 
-  cluster->close_button->on_press =
-      (ev_button_callback_t)cover_switch_cluster_on_close_button_press;
-  cluster->close_button->on_release =
-      (ev_button_callback_t)cover_switch_cluster_on_close_button_release;
-  cluster->close_button->on_long_press =
-      (ev_button_callback_t)cover_switch_cluster_on_close_button_long_press;
+  cluster->close_button->on_press = (ev_button_callback_t)cover_switch_cluster_on_button_press;
+  cluster->close_button->on_release = (ev_button_callback_t)cover_switch_cluster_on_button_release;
+  cluster->close_button->on_long_press = (ev_button_callback_t)cover_switch_cluster_on_button_long_press;
   cluster->close_button->callback_param = cluster;
 
   // Configuration attributes on CoverSwitchConfig SERVER cluster (manufacturer-specific)
@@ -113,7 +112,7 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
                       ATTR_READONLY, multistate_out_of_service);
   SETUP_ATTR_FOR_TABLE(cluster->multistate_attr_infos, 2,
                       ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE, ZCL_DATA_TYPE_UINT16,
-                      ATTR_READONLY, cluster->switch_action);
+                      ATTR_READONLY, cluster->present_value);
   SETUP_ATTR_FOR_TABLE(cluster->multistate_attr_infos, 3,
                       ZCL_ATTR_MULTISTATE_INPUT_STATUS_FLAGS, ZCL_DATA_TYPE_BITMAP8,
                       ATTR_READONLY, multistate_flags);
@@ -125,18 +124,93 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
   endpoint->cluster_count++;
 }
 
-void cover_switch_cluster_report_action(zigbee_cover_switch_cluster *cluster) {
-  hal_zigbee_notify_attribute_changed(cluster->endpoint,
-                                      ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
-                                      ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE);
+uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode) {
+  if (mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_DETACHED) {
+    return 0xFF;
+  }
+
+  if (present_value == MULTISTATE_STOP) {
+    return ZCL_CMD_WINDOW_COVERING_STOP;
+  }
+
+  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
+    if (present_value == MULTISTATE_OPEN) {
+      return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+    } else if (present_value == MULTISTATE_CLOSE) {
+      return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+    }
+  }
+  else {
+    switch (mode) {
+    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START:
+      if (present_value == MULTISTATE_OPEN) {
+        return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+      } else if (present_value == MULTISTATE_CLOSE) {
+        return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+      }
+      break;
+    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_LONG_PRESS:
+      if (present_value == MULTISTATE_LONG_OPEN) {
+        return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+      } else if (present_value == MULTISTATE_LONG_CLOSE) {
+        return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+      }
+      break;
+    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_PRESS:
+      if (present_value == MULTISTATE_RELEASED) {
+        if (cluster->present_value == MULTISTATE_OPEN) {
+          return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+        } else if (cluster->present_value == MULTISTATE_CLOSE) {
+          return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+        }
+      }
+      break;
+    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS:
+      if (present_value == MULTISTATE_LONG_OPEN) {
+        return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+      } else if (present_value == MULTISTATE_LONG_CLOSE) {
+        return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+      } else if (present_value == MULTISTATE_RELEASED) {
+        if (cluster->present_value == MULTISTATE_OPEN) {
+          return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+        } else if (cluster->present_value == MULTISTATE_CLOSE) {
+          return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+        } else if (cluster->present_value == MULTISTATE_LONG_OPEN ||
+                  cluster->present_value == MULTISTATE_LONG_CLOSE) {
+          return ZCL_CMD_WINDOW_COVERING_STOP;
+        }
+      }
+      break;
+    }
+  }
+
+  printf("No action found for present value %d->%d with type %d and mode %d\r\n",
+    cluster->present_value,
+    present_value,
+    cluster->switch_type,
+    mode);
+  return 0xFF;
 }
 
-void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t command) {
-  if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_DETACHED) {
+void cover_switch_cluster_update_present_value(zigbee_cover_switch_cluster *cluster, uint8_t present_value) {
+  if (present_value == cluster->present_value) {
     return;
   }
 
-  // Find the target output cluster
+  uint8_t local_action = cover_switch_cluster_get_action(cluster, present_value, cluster->local_mode);
+  uint8_t binded_action = cover_switch_cluster_get_action(cluster, present_value, cluster->binded_mode);
+
+  cluster->present_value = present_value;
+  hal_zigbee_notify_attribute_changed(cluster->endpoint, 
+                                      ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
+                                      ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE);
+
+  if (local_action != 0xFF) {
+    cover_switch_trigger_output(cluster, local_action);
+  }
+}
+
+void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t action) {
   if (cluster->output_index == 0 || cluster->output_index > cover_clusters_cnt) {
     return;
   }
@@ -144,7 +218,7 @@ void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t c
   zigbee_cover_cluster *output = 
       &cover_clusters[cluster->output_index - 1];
 
-  switch (command) {
+  switch (action) {
   case ZCL_CMD_WINDOW_COVERING_UP_OPEN:
     cover_open(output);
     break;
@@ -154,203 +228,53 @@ void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t c
   case ZCL_CMD_WINDOW_COVERING_STOP:
     cover_stop(output);
     break;
+  default:
+    printf("Unknown action %d\r\n", action);
+    break;
   }
 }
 
-void cover_switch_cluster_on_open_button_press(zigbee_cover_switch_cluster *cluster) {
-  // Check if both buttons are pressed simultaneously
-  if (cluster->close_button->pressed) {
-    // Both buttons pressed - trigger stop
-    if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-      cluster->switch_action = ZCL_COVER_SWITCH_ACTION_POSITION_STOP;
-    } else {
-      cluster->switch_action = ZCL_COVER_SWITCH_ACTION_STOP_PRESS;
-    }
-    cover_switch_cluster_report_action(cluster);
-    
-    if (cluster->local_mode != ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_DETACHED) {
-      cover_switch_trigger_output(cluster, ZCL_CMD_WINDOW_COVERING_STOP);
-    }
+void cover_switch_cluster_on_button_press(zigbee_cover_switch_cluster *cluster) {
+  if (cluster->open_button->pressed && cluster->close_button->pressed) {
+    cover_switch_cluster_update_present_value(cluster, MULTISTATE_STOP);
+  } else if (cluster->open_button->pressed) {
+    cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_CLOSE : MULTISTATE_OPEN);
+  } else if (cluster->close_button->pressed) {
+    cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_OPEN : MULTISTATE_CLOSE);
+  } else {
+    printf("Button press detected, but no button is pressed\r\n");
+  }
+}
+
+void cover_switch_cluster_on_button_long_press(zigbee_cover_switch_cluster *cluster) {
+  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
+    // Toggle does not support long press
     return;
   }
 
-  // Handle based on switch type
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    // Toggle switch: set position based on reversal
-    cluster->switch_action = cluster->reversal ? 
-        ZCL_COVER_SWITCH_ACTION_POSITION_CLOSE : 
-        ZCL_COVER_SWITCH_ACTION_POSITION_OPEN;
-    cover_switch_cluster_report_action(cluster);
-    
-    // Trigger local output immediately for toggle switches
-    uint8_t command = cluster->reversal ? 
-        ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE : 
-        ZCL_CMD_WINDOW_COVERING_UP_OPEN;
-    cover_switch_trigger_output(cluster, command);
-  } else {
-    // Momentary switch: set press action
-    uint8_t action = cluster->reversal ? 
-        ZCL_COVER_SWITCH_ACTION_CLOSE_PRESS : 
-        ZCL_COVER_SWITCH_ACTION_OPEN_PRESS;
-    uint8_t command = cluster->reversal ? 
-        ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE : 
-        ZCL_CMD_WINDOW_COVERING_UP_OPEN;
-
-    cluster->switch_action = action;
-    cover_switch_cluster_report_action(cluster);
-
-    // Trigger local output if configured for press_start or short_and_long
-    if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START ||
-        cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS) {
-      cover_switch_trigger_output(cluster, command);
-    }
-  }
-
-  // TODO: Send bind command if configured
-}
-
-void cover_switch_cluster_on_open_button_release(zigbee_cover_switch_cluster *cluster) {
-  // Handle based on switch type
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    // Toggle switch: return to stop position
-    cluster->switch_action = ZCL_COVER_SWITCH_ACTION_POSITION_STOP;
-    cover_switch_cluster_report_action(cluster);
-    
-    // Stop the cover output
-    cover_switch_trigger_output(cluster, ZCL_CMD_WINDOW_COVERING_STOP);
-  } else {
-    // Momentary switch: return to released state
-    cluster->switch_action = ZCL_COVER_SWITCH_ACTION_RELEASED;
-    cover_switch_cluster_report_action(cluster);
-
-    // Trigger stop on release for press_start mode
-    if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START) {
-      cover_switch_trigger_output(cluster, ZCL_CMD_WINDOW_COVERING_STOP);
-    }
-  }
-}
-
-void cover_switch_cluster_on_open_button_long_press(zigbee_cover_switch_cluster *cluster) {
-  // Long press only applies to momentary switch types
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
+  if (cluster->open_button->pressed && cluster->close_button->pressed) {
+    // We don't care about long presses in stop state
     return;
   }
 
-  uint8_t action = cluster->reversal ? 
-      ZCL_COVER_SWITCH_ACTION_CLOSE_LONG_PRESS : 
-      ZCL_COVER_SWITCH_ACTION_OPEN_LONG_PRESS;
-  uint8_t command = cluster->reversal ? 
-      ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE : 
-      ZCL_CMD_WINDOW_COVERING_UP_OPEN;
-
-  cluster->switch_action = action;
-  cover_switch_cluster_report_action(cluster);
-
-  // Trigger local output if configured for long_press or short_and_long
-  if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_LONG_PRESS ||
-      cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS) {
-    cover_switch_trigger_output(cluster, command);
+  if (cluster->open_button->long_pressed) {
+    cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_LONG_CLOSE : MULTISTATE_LONG_OPEN);
+  } else if (cluster->close_button->long_pressed) {
+    cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_LONG_OPEN : MULTISTATE_LONG_CLOSE);
+  } else {
+    printf("Button long press detected, but no button is long pressed\r\n");
   }
-
-  // TODO: Send bind command if configured
 }
 
-void cover_switch_cluster_on_close_button_press(zigbee_cover_switch_cluster *cluster) {
-  // Check if both buttons are pressed simultaneously
-  if (cluster->open_button->pressed) {
-    // Both buttons pressed - trigger stop
-    if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-      cluster->switch_action = ZCL_COVER_SWITCH_ACTION_POSITION_STOP;
-    } else {
-      cluster->switch_action = ZCL_COVER_SWITCH_ACTION_STOP_PRESS;
-    }
-    cover_switch_cluster_report_action(cluster);
-    
-    if (cluster->local_mode != ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_DETACHED) {
-      cover_switch_trigger_output(cluster, ZCL_CMD_WINDOW_COVERING_STOP);
-    }
+void cover_switch_cluster_on_button_release(zigbee_cover_switch_cluster *cluster) {
+  if (cluster->open_button->pressed || cluster->close_button->pressed) {
     return;
   }
 
-  // Handle based on switch type
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    // Toggle switch: set position based on reversal
-    cluster->switch_action = cluster->reversal ? 
-        ZCL_COVER_SWITCH_ACTION_POSITION_OPEN : 
-        ZCL_COVER_SWITCH_ACTION_POSITION_CLOSE;
-    cover_switch_cluster_report_action(cluster);
-    
-    // Trigger local output immediately for toggle switches
-    uint8_t command = cluster->reversal ? 
-        ZCL_CMD_WINDOW_COVERING_UP_OPEN : 
-        ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
-    cover_switch_trigger_output(cluster, command);
-  } else {
-    // Momentary switch: set press action
-    uint8_t action = cluster->reversal ? 
-        ZCL_COVER_SWITCH_ACTION_OPEN_PRESS : 
-        ZCL_COVER_SWITCH_ACTION_CLOSE_PRESS;
-    uint8_t command = cluster->reversal ? 
-        ZCL_CMD_WINDOW_COVERING_UP_OPEN : 
-        ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
-
-    cluster->switch_action = action;
-    cover_switch_cluster_report_action(cluster);
-
-    // Trigger local output if configured for press_start or short_and_long
-    if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START ||
-        cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS) {
-      cover_switch_trigger_output(cluster, command);
-    }
-  }
-
-  // TODO: Send bind command if configured
-}
-
-void cover_switch_cluster_on_close_button_release(zigbee_cover_switch_cluster *cluster) {
-  // Handle based on switch type
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    // Toggle switch: return to stop position
-    cluster->switch_action = ZCL_COVER_SWITCH_ACTION_POSITION_STOP;
-    cover_switch_cluster_report_action(cluster);
-    
-    // Stop the cover output
-    cover_switch_trigger_output(cluster, ZCL_CMD_WINDOW_COVERING_STOP);
-  } else {
-    // Momentary switch: return to released state
-    cluster->switch_action = ZCL_COVER_SWITCH_ACTION_RELEASED;
-    cover_switch_cluster_report_action(cluster);
-
-    // Trigger stop on release for press_start mode
-    if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START) {
-      cover_switch_trigger_output(cluster, ZCL_CMD_WINDOW_COVERING_STOP);
-    }
-  }
-}
-
-void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster *cluster) {
-  // Long press only applies to momentary switch types
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    return;
-  }
-
-  uint8_t action = cluster->reversal ? 
-      ZCL_COVER_SWITCH_ACTION_OPEN_LONG_PRESS : 
-      ZCL_COVER_SWITCH_ACTION_CLOSE_LONG_PRESS;
-  uint8_t command = cluster->reversal ? 
-      ZCL_CMD_WINDOW_COVERING_UP_OPEN : 
-      ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
-
-  cluster->switch_action = action;
-  cover_switch_cluster_report_action(cluster);
-
-  // Trigger local output if configured for long_press or short_and_long
-  if (cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_LONG_PRESS ||
-      cluster->local_mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS) {
-    cover_switch_trigger_output(cluster, command);
-  }
-
-  // TODO: Send bind command if configured
+  uint8_t action = cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE ?
+    MULTISTATE_STOP :
+    MULTISTATE_RELEASED;
+  cover_switch_cluster_update_present_value(cluster, action);
 }
 
 void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster) {
@@ -362,9 +286,9 @@ void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster) {
   
   // Set initial action based on switch type
   if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    cluster->switch_action = ZCL_COVER_SWITCH_ACTION_POSITION_STOP;
+    cluster->present_value = MULTISTATE_STOP;
   } else {
-    cluster->switch_action = ZCL_COVER_SWITCH_ACTION_RELEASED;
+    cluster->present_value = MULTISTATE_RELEASED;
   }
 }
 
@@ -402,13 +326,15 @@ void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
                                          uint16_t attribute_id) {
   switch (attribute_id) {
   case ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE:
-    // Update the switch action based on new switch type
+    // Update the switch press action based on new switch type
     if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-      cluster->switch_action = ZCL_COVER_SWITCH_ACTION_POSITION_STOP;
+      cluster->present_value = MULTISTATE_STOP;
     } else {
-      cluster->switch_action = ZCL_COVER_SWITCH_ACTION_RELEASED;
+      cluster->present_value = MULTISTATE_RELEASED;
     }
-    cover_switch_cluster_report_action(cluster);
+    hal_zigbee_notify_attribute_changed(cluster->endpoint, 
+                                        ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
+                                        ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE);
     cover_switch_cluster_store_attrs_to_nv(cluster);
     break;
   case ZCL_ATTR_COVER_SWITCH_CONFIG_OUTPUT_INDEX:

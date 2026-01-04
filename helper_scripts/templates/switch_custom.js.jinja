@@ -201,21 +201,18 @@ const romasku = {
             entity_category: "diagnostic"
         }),
     // Cover-specific definitions
-    coverSwitchAction: (name, endpointName) =>
+    coverPressAction: (name, endpointName) =>
         enumLookup({
             name,
             endpointName,
             access: "STATE_GET",
             lookup: { 
                 released: 0, 
-                up_press: 1, 
-                down_press: 2,
-                stop_press: 3,
-                up_long_press: 4,
-                down_long_press: 5,
-                position_stop: 6,
-                position_up: 7,
-                position_down: 8
+                open: 1, 
+                close: 2,
+                stop: 3,
+                long_open: 4,
+                long_close: 5
             },
             cluster: "genMultistateInput",
             attribute: "presentValue",
@@ -466,7 +463,7 @@ const definitions = [
             {% if device.coverSwitchNames %}
             // Cover switch inputs
             {% for inputName in device.coverSwitchNames %}
-            romasku.coverSwitchAction("switch_action", "{{inputName}}"),
+            romasku.coverPressAction("press_action", "{{inputName}}"),
             romasku.coverSwitchType("switch_type", "{{inputName}}"),
             romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
             romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),

@@ -29,7 +29,7 @@ typedef struct {
   hal_zigbee_attribute config_attr_infos[6];
   
   // Multistate Input Attributes
-  uint16_t switch_action;
+  uint16_t present_value;
   hal_zigbee_attribute multistate_attr_infos[4];
 } zigbee_cover_switch_cluster;
 
