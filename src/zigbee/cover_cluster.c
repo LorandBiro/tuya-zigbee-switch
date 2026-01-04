@@ -216,12 +216,9 @@ void cover_stop(zigbee_cover_cluster *cluster) {
                               ZCL_DATA_TYPE_UINT8,
                               &cluster->position,
                               1);
-  hal_zigbee_send_report_attr(cluster->endpoint,
-                              ZCL_CLUSTER_WINDOW_COVERING,
-                              ZCL_ATTR_WINDOW_COVERING_MOVING,
-                              ZCL_DATA_TYPE_ENUM8,
-                              &cluster->moving,
-                              1);
+  hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                     ZCL_CLUSTER_WINDOW_COVERING,
+                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
 // ============================================================================
@@ -336,12 +333,9 @@ void cover_auto_stop_handler(void *arg) {
                               ZCL_DATA_TYPE_UINT8,
                               &cluster->position,
                               1);
-  hal_zigbee_send_report_attr(cluster->endpoint,
-                              ZCL_CLUSTER_WINDOW_COVERING,
-                              ZCL_ATTR_WINDOW_COVERING_MOVING,
-                              ZCL_DATA_TYPE_ENUM8,
-                              &cluster->moving,
-                              1);
+  hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                     ZCL_CLUSTER_WINDOW_COVERING,
+                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
 void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos) {
@@ -428,13 +422,10 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
   cluster->position_update_task.arg = cluster;
   cover_schedule_next_position_update(cluster);
   
-  // Send unsolicited report for moving state changed
-  hal_zigbee_send_report_attr(cluster->endpoint,
-                              ZCL_CLUSTER_WINDOW_COVERING,
-                              ZCL_ATTR_WINDOW_COVERING_MOVING,
-                              ZCL_DATA_TYPE_ENUM8,
-                              &cluster->moving,
-                              1);
+  // Notify moving state changed
+  hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                     ZCL_CLUSTER_WINDOW_COVERING,
+                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
 // ============================================================================
@@ -474,13 +465,10 @@ void cover_start_calibration_movement(zigbee_cover_cluster *cluster,
   cluster->calibration_timeout_task.arg = cluster;
   hal_tasks_schedule(&cluster->calibration_timeout_task, 120000);
 
-  // Send unsolicited report for moving state changed
-  hal_zigbee_send_report_attr(cluster->endpoint,
-                              ZCL_CLUSTER_WINDOW_COVERING,
-                              ZCL_ATTR_WINDOW_COVERING_MOVING,
-                              ZCL_DATA_TYPE_ENUM8,
-                              &cluster->moving,
-                              1);
+  // Notify moving state changed
+  hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                     ZCL_CLUSTER_WINDOW_COVERING,
+                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
 void cover_complete_calibration(zigbee_cover_cluster *cluster) {
@@ -556,12 +544,9 @@ void cover_complete_calibration(zigbee_cover_cluster *cluster) {
   hal_zigbee_notify_attribute_changed(
       cluster->endpoint, ZCL_CLUSTER_WINDOW_COVERING,
       ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE);
-  hal_zigbee_send_report_attr(cluster->endpoint,
-                              ZCL_CLUSTER_WINDOW_COVERING,
-                              ZCL_ATTR_WINDOW_COVERING_MOVING,
-                              ZCL_DATA_TYPE_ENUM8,
-                              &cluster->moving,
-                              1);
+  hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                     ZCL_CLUSTER_WINDOW_COVERING,
+                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
 void cover_calibration_timeout_handler(void *arg) {
@@ -580,12 +565,9 @@ void cover_calibration_timeout_handler(void *arg) {
   hal_zigbee_send_report_attr(cluster->endpoint, ZCL_CLUSTER_WINDOW_COVERING,
                               ZCL_ATTR_WINDOW_COVERING_CALIBRATION,
                               ZCL_DATA_TYPE_BOOLEAN, &calib_val, 1);
-  hal_zigbee_send_report_attr(cluster->endpoint,
-                              ZCL_CLUSTER_WINDOW_COVERING,
-                              ZCL_ATTR_WINDOW_COVERING_MOVING,
-                              ZCL_DATA_TYPE_ENUM8,
-                              &cluster->moving,
-                              1);
+  hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                     ZCL_CLUSTER_WINDOW_COVERING,
+                                     ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
 // ============================================================================
@@ -705,12 +687,9 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
         relay_off(cluster->open_relay);
         relay_off(cluster->close_relay);
         cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
-        hal_zigbee_send_report_attr(cluster->endpoint,
-                                    ZCL_CLUSTER_WINDOW_COVERING,
-                                    ZCL_ATTR_WINDOW_COVERING_MOVING,
-                                    ZCL_DATA_TYPE_ENUM8,
-                                    &cluster->moving,
-                                    1);
+        hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                           ZCL_CLUSTER_WINDOW_COVERING,
+                                           ZCL_ATTR_WINDOW_COVERING_MOVING);
       }
       // Send unsolicited report
       uint8_t calib_val = 0;
