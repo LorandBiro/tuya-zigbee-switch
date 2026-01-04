@@ -544,7 +544,7 @@ const definitions = [
             await reporting.bind(cover{{loop.index}}, coordinatorEndpoint, ["closuresWindowCovering"]);
             await cover{{loop.index}}.configureReporting("closuresWindowCovering", [
                 {
-                    attribute: {ID: 0xff06, type: Zcl.DataType.ENUM8},
+                    attribute: "moving",
                     minimumReportInterval: 0,
                     maximumReportInterval: constants.repInterval.MAX,
                     reportableChange: 1,
