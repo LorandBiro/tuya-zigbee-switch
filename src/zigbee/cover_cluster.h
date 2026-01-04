@@ -11,7 +11,7 @@ typedef struct {
   uint16_t calibration_time;
   uint16_t closed_slack;
   uint16_t open_slack;
-  uint16_t motor_position_bp;
+  uint16_t motor_position;
 } zigbee_cover_cluster_config;
 
 typedef struct {
@@ -33,9 +33,9 @@ typedef struct {
   hal_zigbee_attribute attr_infos[8];
 
   // State
-  uint16_t motor_position_bp;
+  uint16_t motor_position;
   uint32_t movement_start_time;
-  uint16_t start_motor_position_bp;
+  uint16_t start_motor_position;
   uint8_t calibration_direction;
   hal_task_t stop_task;
   hal_task_t position_update_task;
@@ -50,7 +50,6 @@ void cover_cluster_add_to_endpoint(
 void cover_open(zigbee_cover_cluster *cluster);
 void cover_close(zigbee_cover_cluster *cluster);
 void cover_stop(zigbee_cover_cluster *cluster);
-void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_position);
 
 void cover_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                   uint16_t attribute_id);
