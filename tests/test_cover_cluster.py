@@ -16,9 +16,9 @@ from zcl_consts import (
     ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE,
     ZCL_CMD_WINDOW_COVERING_STOP,
     ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE,
-    COVER_STOPPED,
-    COVER_OPENING,
-    COVER_CLOSING,
+    ZCL_WINDOW_COVERING_MOVING_STOPPED,
+    ZCL_WINDOW_COVERING_MOVING_OPENING,
+    ZCL_WINDOW_COVERING_MOVING_CLOSING,
 )
 
 
@@ -50,7 +50,7 @@ def test_cover_stop_command():
             ZCL_CLUSTER_WINDOW_COVERING,
             ZCL_ATTR_WINDOW_COVERING_MOVING
         )
-        assert int(status) == COVER_STOPPED
+        assert int(status) == ZCL_WINDOW_COVERING_MOVING_STOPPED
         
     finally:
         p.stop()
@@ -211,7 +211,7 @@ def test_cover_open_command():
         moving = d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         )
-        assert int(moving) == COVER_OPENING
+        assert int(moving) == ZCL_WINDOW_COVERING_MOVING_OPENING
         
     finally:
         p.stop()
@@ -246,7 +246,7 @@ def test_cover_close_command():
         moving = d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         )
-        assert int(moving) == COVER_CLOSING
+        assert int(moving) == ZCL_WINDOW_COVERING_MOVING_CLOSING
         
     finally:
         p.stop()
@@ -277,7 +277,7 @@ def test_cover_direction_change_stops_first():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_OPENING
+        assert moving == ZCL_WINDOW_COVERING_MOVING_OPENING
         assert d.get_gpio("A0", refresh=True), "OPEN relay should be active"
         
         # Now send CLOSE command (should stop OPEN first)
@@ -292,7 +292,7 @@ def test_cover_direction_change_stops_first():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_CLOSING
+        assert moving == ZCL_WINDOW_COVERING_MOVING_CLOSING
         
     finally:
         p.stop()
@@ -394,7 +394,7 @@ def test_cover_goto_position():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving != COVER_STOPPED, "Should be moving to position"
+        assert moving != ZCL_WINDOW_COVERING_MOVING_STOPPED, "Should be moving to position"
         
         # Wait for auto-stop (half of calibration time + margin)
         d.step_time(6000)  # If calib is 10s, halfway is ~5s
@@ -403,7 +403,7 @@ def test_cover_goto_position():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_STOPPED, "Should have auto-stopped"
+        assert moving == ZCL_WINDOW_COVERING_MOVING_STOPPED, "Should have auto-stopped"
         
         # Position should be near target (minimal timing test - just verify it's not 0 or 100)
         position = int(d.read_zigbee_attr(
@@ -442,7 +442,7 @@ def test_cover_moving_state_attribute():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_STOPPED, "Should be initially stopped"
+        assert moving == ZCL_WINDOW_COVERING_MOVING_STOPPED, "Should be initially stopped"
         
         # Start opening
         d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
@@ -450,7 +450,7 @@ def test_cover_moving_state_attribute():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_OPENING, "Should be opening"
+        assert moving == ZCL_WINDOW_COVERING_MOVING_OPENING, "Should be opening"
         
         # Stop
         d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_STOP)
@@ -458,7 +458,7 @@ def test_cover_moving_state_attribute():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_STOPPED, "Should be stopped after STOP command"
+        assert moving == ZCL_WINDOW_COVERING_MOVING_STOPPED, "Should be stopped after STOP command"
         
         # Start closing
         d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
@@ -466,7 +466,7 @@ def test_cover_moving_state_attribute():
         moving = int(d.read_zigbee_attr(
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
-        assert moving == COVER_CLOSING, "Should be closing"
+        assert moving == ZCL_WINDOW_COVERING_MOVING_CLOSING, "Should be closing"
         
     finally:
         p.stop()

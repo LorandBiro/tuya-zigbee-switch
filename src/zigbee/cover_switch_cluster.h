@@ -5,27 +5,6 @@
 #include "hal/zigbee.h"
 #include <stdint.h>
 
-// Cover switch press actions (MultiStateInput values)
-#define COVER_SWITCH_RELEASED 0
-#define COVER_SWITCH_OPEN_PRESS 1
-#define COVER_SWITCH_CLOSE_PRESS 2
-#define COVER_SWITCH_STOP_PRESS 3
-#define COVER_SWITCH_OPEN_LONG_PRESS 4
-#define COVER_SWITCH_CLOSE_LONG_PRESS 5
-
-// Local mode options
-#define COVER_LOCAL_MODE_DETACHED 0
-#define COVER_LOCAL_MODE_PRESS_START 1
-#define COVER_LOCAL_MODE_SHORT_PRESS 3
-#define COVER_LOCAL_MODE_LONG_PRESS 2
-#define COVER_LOCAL_MODE_SHORT_AND_LONG_PRESS 4
-
-// Binded mode options
-#define COVER_BINDED_MODE_PRESS_START 1
-#define COVER_BINDED_MODE_SHORT_PRESS 3
-#define COVER_BINDED_MODE_LONG_PRESS 2
-#define COVER_BINDED_MODE_SHORT_AND_LONG_PRESS 4
-
 typedef struct {
   uint8_t output_index;
   uint8_t reversal;
