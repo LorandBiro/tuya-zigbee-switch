@@ -209,11 +209,7 @@ void parse_config() {
 
       cover_switch_clusters[cover_switch_clusters_cnt].open_button = open_button;
       cover_switch_clusters[cover_switch_clusters_cnt].close_button = close_button;
-      cover_switch_clusters[cover_switch_clusters_cnt].input_idx = cover_switch_clusters_cnt;
-      cover_switch_clusters[cover_switch_clusters_cnt].output_index = cover_clusters_cnt + 1;  // Default to next output
-      cover_switch_clusters[cover_switch_clusters_cnt].reversal = 0;
-      cover_switch_clusters[cover_switch_clusters_cnt].local_mode = COVER_LOCAL_MODE_SHORT_AND_LONG_PRESS;
-      cover_switch_clusters[cover_switch_clusters_cnt].binded_mode = COVER_BINDED_MODE_SHORT_AND_LONG_PRESS;
+      cover_switch_clusters[cover_switch_clusters_cnt].cover_switch_idx = cover_switch_clusters_cnt;
       cover_switch_clusters_cnt++;
       
     } else if (entry[0] == 'W') {

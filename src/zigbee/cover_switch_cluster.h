@@ -26,27 +26,32 @@
 #define COVER_BINDED_MODE_LONG_PRESS 2
 #define COVER_BINDED_MODE_SHORT_AND_LONG_PRESS 4
 
-// Configuration attributes (similar to switch_cluster)
 typedef struct {
-  uint8_t input_idx;
+  uint8_t output_index;
+  uint8_t reversal;
+  uint8_t local_mode;
+  uint8_t binded_mode;
+  uint8_t switch_type;
+} zigbee_cover_switch_cluster_config;
+
+typedef struct {
+  // Parameters
+  uint8_t cover_switch_idx;
   uint8_t endpoint;
-  
-  // Physical buttons
   button_t *open_button;
   button_t *close_button;
   
-  // Configuration attributes
-  uint8_t switch_type;             // Switch type (always 0x02 = multifunction)
-  uint8_t output_index;            // Which cover to control locally
-  uint8_t reversal;                // Swap OPEN/CLOSE (0=normal, 1=reversed)
-  uint8_t local_mode;              // Detached/press_start/short/long/both
-  uint8_t binded_mode;             // When to send bind commands
+  // On/Off Switch Configuration Attributes
+  uint8_t switch_type;
+  uint8_t output_index;
+  uint8_t reversal;
+  uint8_t local_mode;
+  uint8_t binded_mode;
+  hal_zigbee_attribute config_attr_infos[6];
   
-  // State reporting
-  uint16_t multistate_state;       // Current press action
-  
-  hal_zigbee_attribute config_attr_infos[6];      // OnOffSwitchConfig attributes (configuration)
-  hal_zigbee_attribute multistate_attr_infos[4];  // MultiStateInput attributes (state reporting)
+  // Multistate Input Attributes
+  uint16_t multistate_state;
+  hal_zigbee_attribute multistate_attr_infos[4];
 } zigbee_cover_switch_cluster;
 
 void cover_switch_cluster_add_to_endpoint(
@@ -57,5 +62,3 @@ void cover_switch_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                         uint16_t attribute_id);
 
 #endif
-
-

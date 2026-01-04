@@ -30,6 +30,9 @@ void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster
 
 zigbee_cover_switch_cluster *cover_switch_cluster_by_endpoint[10];
 
+static zigbee_cover_switch_cluster_config nv_config_buffer;
+
+void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster);
 void cover_switch_cluster_store_attrs_to_nv(zigbee_cover_switch_cluster *cluster);
 void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluster);
 void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
@@ -48,6 +51,7 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
                                            hal_zigbee_endpoint *endpoint) {
   cover_switch_cluster_by_endpoint[endpoint->endpoint] = cluster;
   cluster->endpoint = endpoint->endpoint;
+  cover_switch_cluster_init(cluster);
   cover_switch_cluster_load_attrs_from_nv(cluster);
 
   cluster->open_button->on_press =
@@ -237,36 +241,43 @@ void cover_switch_cluster_on_close_button_long_press(zigbee_cover_switch_cluster
   // TODO: Send bind command if configured
 }
 
+void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster) {
+  cluster->switch_type = 0x02; // Multifunction (momentary)
+  cluster->output_index = cluster->cover_switch_idx + 1;
+  cluster->reversal = 0;
+  cluster->local_mode = COVER_LOCAL_MODE_SHORT_AND_LONG_PRESS;
+  cluster->binded_mode = COVER_BINDED_MODE_SHORT_AND_LONG_PRESS;
+  cluster->multistate_state = COVER_SWITCH_RELEASED;
+}
+
 void cover_switch_cluster_store_attrs_to_nv(zigbee_cover_switch_cluster *cluster) {
-  // Store: output_index (1) + reversal (1) + local_mode (1) + binded_mode (1) + switch_type (1) = 5 bytes
-  uint8_t data[5];
-  data[0] = cluster->output_index;
-  data[1] = cluster->reversal;
-  data[2] = cluster->local_mode;
-  data[3] = cluster->binded_mode;
-  data[4] = cluster->switch_type;
+  nv_config_buffer.output_index = cluster->output_index;
+  nv_config_buffer.reversal = cluster->reversal;
+  nv_config_buffer.local_mode = cluster->local_mode;
+  nv_config_buffer.binded_mode = cluster->binded_mode;
+  nv_config_buffer.switch_type = cluster->switch_type;
   
-  hal_nvm_write(NV_ITEM_COVER_SWITCH_CONFIG(cluster->input_idx), 5, data);
+  hal_nvm_write(NV_ITEM_COVER_SWITCH_CONFIG(cluster->cover_switch_idx),
+                sizeof(zigbee_cover_switch_cluster_config),
+                (uint8_t *)&nv_config_buffer);
 }
 
 void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluster) {
-  uint8_t data[5];
-  uint8_t read_status = hal_nvm_read(
-      NV_ITEM_COVER_SWITCH_CONFIG(cluster->input_idx), 5, data);
-  if (read_status != 0) {
-    // Default values
-    cluster->output_index = cluster->input_idx + 1;  // Default to same index + 1
-    cluster->reversal = 0;
-    cluster->local_mode = COVER_LOCAL_MODE_SHORT_AND_LONG_PRESS;
-    cluster->binded_mode = COVER_BINDED_MODE_SHORT_AND_LONG_PRESS;
-    cluster->switch_type = 0x02;  // Multifunction (momentary)
-  } else {
-    cluster->output_index = data[0];
-    cluster->reversal = data[1];
-    cluster->local_mode = data[2];
-    cluster->binded_mode = data[3];
-    cluster->switch_type = data[4];
+  hal_nvm_status_t st = hal_nvm_read(
+      NV_ITEM_COVER_SWITCH_CONFIG(cluster->cover_switch_idx),
+      sizeof(zigbee_cover_switch_cluster_config),
+      (uint8_t *)&nv_config_buffer);
+  
+  if (st != HAL_NVM_SUCCESS) {
+    printf("No cover switch config in NV, using defaults\r\n");
+    return;
   }
+  
+  cluster->output_index = nv_config_buffer.output_index;
+  cluster->reversal = nv_config_buffer.reversal;
+  cluster->local_mode = nv_config_buffer.local_mode;
+  cluster->binded_mode = nv_config_buffer.binded_mode;
+  cluster->switch_type = nv_config_buffer.switch_type;
 }
 
 void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
