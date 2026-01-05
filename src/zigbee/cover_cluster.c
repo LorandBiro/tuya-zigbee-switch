@@ -48,6 +48,8 @@ void cover_calibration_timeout_handler(void *arg);
 
 // Movement control
 void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_position);
+void cover_execute_movement(zigbee_cover_cluster *cluster, uint8_t target_position);
+void cover_safety_delay_handler(void *arg);
 
 // ============================================================================
 // Section 2: Static arrays & trampoline functions
@@ -190,6 +192,9 @@ void cover_stop(zigbee_cover_cluster *cluster) {
   relay_off(cluster->open_relay);
   relay_off(cluster->close_relay);
 
+  cluster->last_relay_off_time = hal_millis();
+  cluster->has_pending_movement = 0;
+
   // Update current position before stopping
   if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
     cover_update_position(cluster);
@@ -217,6 +222,7 @@ void cover_cancel_movement_tasks(zigbee_cover_cluster *cluster) {
   hal_tasks_unschedule(&cluster->stop_task);
   hal_tasks_unschedule(&cluster->position_update_task);
   hal_tasks_unschedule(&cluster->calibration_timeout_task);
+  hal_tasks_unschedule(&cluster->safety_delay_task);
 }
 
 void cover_update_position(zigbee_cover_cluster *cluster) {
@@ -282,6 +288,8 @@ void cover_auto_stop_handler(void *arg) {
   relay_off(cluster->open_relay);
   relay_off(cluster->close_relay);
 
+  cluster->last_relay_off_time = hal_millis();
+
   // Update motor position to final position
   uint32_t elapsed_ms = hal_millis() - cluster->movement_start_time;
   uint32_t calibration_ms = cluster->calibration_time * 100;
@@ -319,23 +327,9 @@ void cover_auto_stop_handler(void *arg) {
                                      ZCL_ATTR_WINDOW_COVERING_MOVING);
 }
 
-void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos) {
-  if (cluster->calibration_time == 0) {
-    printf("ERROR: Cannot go-to-position - not calibrated\r\n");
-    return;
-  }
-
-  if (target_cover_pos > 100) {
-    printf("ERROR: Cannot go above 100%%\r\n");
-    return;
-  }
-
+void cover_execute_movement(zigbee_cover_cluster *cluster, uint8_t target_cover_pos) {
   uint16_t target_motor_position = cover_to_motor_position(cluster, target_cover_pos);
-  if (cluster->motor_position == target_motor_position) {
-    printf("Already at target motor position\r\n");
-    return;
-  }
-
+  
   cover_cancel_movement_tasks(cluster);
 
   uint32_t duration_ms;
@@ -374,6 +368,78 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
 
   cover_schedule_next_position_update(cluster);
   hal_tasks_schedule(&cluster->stop_task, duration_ms);
+}
+
+void cover_safety_delay_handler(void *arg) {
+  zigbee_cover_cluster *cluster = (zigbee_cover_cluster *)arg;
+  printf("Safety delay expired\r\n");
+  
+  if (cluster->has_pending_movement) {
+    printf("Executing pending movement to %d%%\r\n", cluster->pending_target_position);
+    cluster->has_pending_movement = 0;
+    cover_execute_movement(cluster, cluster->pending_target_position);
+  }
+}
+
+void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos) {
+  if (cluster->calibration_time == 0) {
+    printf("ERROR: Cannot go-to-position - not calibrated\r\n");
+    return;
+  }
+
+  if (target_cover_pos > 100) {
+    printf("ERROR: Cannot go above 100%%\r\n");
+    return;
+  }
+
+  uint16_t target_motor_position = cover_to_motor_position(cluster, target_cover_pos);
+  if (cluster->motor_position == target_motor_position) {
+    printf("Already at target motor position\r\n");
+    return;
+  }
+
+  // Check if we need to apply safety delay
+  uint8_t relays_currently_active = (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED);
+  
+  if (relays_currently_active) {
+    // Stop relays immediately
+    printf("Stopping for safety delay before direction change\r\n");
+    cover_cancel_movement_tasks(cluster);
+    relay_off(cluster->open_relay);
+    relay_off(cluster->close_relay);
+    
+    if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
+      cover_update_position(cluster);
+    }
+    
+    cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
+    cluster->last_relay_off_time = hal_millis();
+    hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                       ZCL_CLUSTER_WINDOW_COVERING,
+                                       ZCL_ATTR_WINDOW_COVERING_MOVING);
+    
+    // Queue the new movement
+    cluster->pending_target_position = target_cover_pos;
+    cluster->has_pending_movement = 1;
+    hal_tasks_schedule(&cluster->safety_delay_task, 500);
+    return;
+  }
+  
+  // Check if we're within safety delay period from last relay-off
+  if (cluster->last_relay_off_time > 0) {
+    uint32_t elapsed_since_off = hal_millis() - cluster->last_relay_off_time;
+    if (elapsed_since_off < 500) {
+      printf("Within safety delay period, queuing movement (elapsed: %ums)\r\n", elapsed_since_off);
+      cluster->pending_target_position = target_cover_pos;
+      cluster->has_pending_movement = 1;
+      uint32_t remaining_delay = 500 - elapsed_since_off;
+      hal_tasks_schedule(&cluster->safety_delay_task, remaining_delay);
+      return;
+    }
+  }
+  
+  // Safe to execute immediately
+  cover_execute_movement(cluster, target_cover_pos);
 }
 
 // ============================================================================
@@ -454,6 +520,8 @@ void cover_complete_calibration(zigbee_cover_cluster *cluster) {
   relay_off(cluster->open_relay);
   relay_off(cluster->close_relay);
 
+  cluster->last_relay_off_time = hal_millis();
+
   // Save calibration time
   cluster->calibration_time = measured_time;
   printf("Calibration saved: %u units (%u.%u seconds)\r\n", measured_time,
@@ -503,6 +571,7 @@ void cover_calibration_timeout_handler(void *arg) {
   relay_off(cluster->open_relay);
   relay_off(cluster->close_relay);
 
+  cluster->last_relay_off_time = hal_millis();
   cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
   cluster->calibration = 0;
 
@@ -573,6 +642,9 @@ void cover_cluster_init(zigbee_cover_cluster *cluster) {
   cluster->movement_start_time = 0;
   cluster->start_motor_position = 0;
   cluster->calibration_direction = 0;
+  cluster->last_relay_off_time = 0;
+  cluster->pending_target_position = 0;
+  cluster->has_pending_movement = 0;
 
   hal_tasks_init(&cluster->stop_task);
   cluster->stop_task.handler = cover_auto_stop_handler;
@@ -585,6 +657,10 @@ void cover_cluster_init(zigbee_cover_cluster *cluster) {
   hal_tasks_init(&cluster->calibration_timeout_task);
   cluster->calibration_timeout_task.handler = cover_calibration_timeout_handler;
   cluster->calibration_timeout_task.arg = cluster;
+  
+  hal_tasks_init(&cluster->safety_delay_task);
+  cluster->safety_delay_task.handler = cover_safety_delay_handler;
+  cluster->safety_delay_task.arg = cluster;
 }
 
 // ============================================================================

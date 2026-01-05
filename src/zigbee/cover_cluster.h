@@ -37,10 +37,13 @@ typedef struct {
   uint32_t movement_start_time;
   uint16_t start_motor_position;
   uint8_t calibration_direction;
+  uint32_t last_relay_off_time;
+  uint8_t pending_target_position;
+  uint8_t has_pending_movement;
   hal_task_t stop_task;
   hal_task_t position_update_task;
   hal_task_t calibration_timeout_task;
-
+  hal_task_t safety_delay_task;
 } zigbee_cover_cluster;
 
 void cover_cluster_add_to_endpoint(

@@ -280,13 +280,20 @@ def test_cover_direction_change_stops_first():
         assert moving == ZCL_WINDOW_COVERING_MOVING_OPENING
         assert d.get_gpio("A0", refresh=True), "OPEN relay should be active"
         
-        # Now send CLOSE command (should stop OPEN first)
+        # Now send CLOSE command (should stop OPEN first, then wait 500ms safety delay)
         d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
-        d.step_time(60)  # Wait for transition
+        d.step_time(10)
         
-        # Verify OPEN relay is OFF and CLOSE relay is ON
+        # Both relays should be OFF immediately (stopped for safety)
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF immediately (safety)"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF (waiting for safety delay)"
+        
+        # Wait for 500ms safety delay
+        d.step_time(540)  # Total: 550ms from direction change
+        
+        # Now CLOSE relay should be active
         assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF (safety)"
-        assert d.get_gpio("A1", refresh=True), "CLOSE relay should be active"
+        assert d.get_gpio("A1", refresh=True), "CLOSE relay should be active after safety delay"
         
         # Verify closing state
         moving = int(d.read_zigbee_attr(
@@ -330,7 +337,7 @@ def test_cover_motor_reversal():
         assert not d.get_gpio("A1", refresh=True), "Normal: A1 should be OFF"
         
         d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_STOP)
-        d.step_time(50)
+        d.step_time(550)  # Wait for safety delay after stop
         
         # Reversed operation (reversal = 1)
         d.write_zigbee_attr(
@@ -380,6 +387,9 @@ def test_cover_goto_position():
             ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE
         ))
         assert position == 0, f"Should be at 0% to start, but at {position}%"
+        
+        # Wait for safety delay after auto-stop
+        d.step_time(500)
         
         # Go to 50%
         d.call_zigbee_cmd(
@@ -460,6 +470,9 @@ def test_cover_moving_state_attribute():
         ))
         assert moving == ZCL_WINDOW_COVERING_MOVING_STOPPED, "Should be stopped after STOP command"
         
+        # Wait for safety delay before starting new movement
+        d.step_time(500)
+        
         # Start closing
         d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
         d.step_time(50)
@@ -467,6 +480,117 @@ def test_cover_moving_state_attribute():
             endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
         ))
         assert moving == ZCL_WINDOW_COVERING_MOVING_CLOSING, "Should be closing"
+        
+    finally:
+        p.stop()
+
+
+def test_cover_direction_change_with_safety_delay():
+    """Test that changing direction has a 500ms safety delay between relay actions."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100  # 10 seconds
+        )
+        d.step_time(10)
+        
+        # Start opening
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
+        
+        # Verify opening relay is ON
+        assert d.get_gpio("A0", refresh=True), "OPEN relay should be active"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF"
+        
+        # Now send CLOSE command (should trigger safety delay)
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE)
+        d.step_time(10)
+        
+        # Both relays should be OFF immediately after direction change command
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF immediately"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF immediately"
+        
+        # Should still be OFF at 400ms (before safety delay expires)
+        d.step_time(390)
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should still be OFF at 400ms"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should still be OFF at 400ms"
+        
+        # After 500ms safety delay, CLOSE relay should be ON
+        d.step_time(150)  # Total: 550ms
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF"
+        assert d.get_gpio("A1", refresh=True), "CLOSE relay should be ON after safety delay"
+        
+        # Verify closing state
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == ZCL_WINDOW_COVERING_MOVING_CLOSING, "Should be closing after safety delay"
+        
+    finally:
+        p.stop()
+
+
+def test_cover_restart_after_stop_with_safety_delay():
+    """Test that restarting movement after stop respects 500ms safety delay."""
+    cfg = "Mfr;Model;WA0A1;"
+    p = StubProc(device_config=cfg).start()
+    try:
+        d = Device(p)
+        endpoint = 1
+        
+        # Set calibration time
+        d.write_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME,
+            100  # 10 seconds
+        )
+        d.step_time(10)
+        
+        # Start opening
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(50)
+        
+        # Verify opening relay is ON
+        assert d.get_gpio("A0", refresh=True), "OPEN relay should be active"
+        
+        # Send STOP at t=100ms
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_STOP)
+        d.step_time(10)
+        
+        # Both relays should be OFF
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should be OFF after stop"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF after stop"
+        
+        # Wait 100ms, then send OPEN command again (at t=200ms from stop)
+        d.step_time(90)
+        d.call_zigbee_cmd(endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_CMD_WINDOW_COVERING_UP_OPEN)
+        d.step_time(10)
+        
+        # Relays should still be OFF (safety delay not expired yet)
+        assert not d.get_gpio("A0", refresh=True), "OPEN relay should still be OFF (safety delay)"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should still be OFF"
+        
+        # Wait another 300ms to reach 500ms from stop (plus some margin)
+        d.step_time(390)
+        
+        # Now OPEN relay should be ON
+        assert d.get_gpio("A0", refresh=True), "OPEN relay should be ON after safety delay expires"
+        assert not d.get_gpio("A1", refresh=True), "CLOSE relay should be OFF"
+        
+        # Verify opening state
+        moving = int(d.read_zigbee_attr(
+            endpoint, ZCL_CLUSTER_WINDOW_COVERING, ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
+        assert moving == ZCL_WINDOW_COVERING_MOVING_OPENING, "Should be opening after safety delay"
         
     finally:
         p.stop()
