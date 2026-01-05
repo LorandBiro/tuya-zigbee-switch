@@ -64,6 +64,6 @@ def test_toggle_both_buttons_pressed(toggle_cover_switch: Device):
     toggle_cover_switch.press_button("A1")
     assert toggle_cover_switch.zcl_switch_get_multistate_value(1) == STOP
     toggle_cover_switch.release_button("A1")
-    assert toggle_cover_switch.zcl_switch_get_multistate_value(1) == STOP
+    assert toggle_cover_switch.zcl_switch_get_multistate_value(1) == OPEN
     toggle_cover_switch.release_button("A0")
     assert toggle_cover_switch.zcl_switch_get_multistate_value(1) == STOP

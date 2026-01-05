@@ -267,14 +267,27 @@ void cover_switch_cluster_on_button_long_press(zigbee_cover_switch_cluster *clus
 }
 
 void cover_switch_cluster_on_button_release(zigbee_cover_switch_cluster *cluster) {
-  if (cluster->open_button->pressed || cluster->close_button->pressed) {
+  if (!cluster->open_button->pressed && !cluster->close_button->pressed) {
+    uint8_t action = cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE ?
+      MULTISTATE_STOP :
+      MULTISTATE_RELEASED;
+    cover_switch_cluster_update_present_value(cluster, action);
     return;
   }
 
-  uint8_t action = cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE ?
-    MULTISTATE_STOP :
-    MULTISTATE_RELEASED;
-  cover_switch_cluster_update_present_value(cluster, action);
+  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_MOMENTARY) {
+    // Momentary switches must not revert back to OPEN or CLOSE when one of the buttons is released, otherwise it would
+    // generate unwanted commands.
+    return;
+  }
+
+  // Regular toggle-type cover switches won't be able to close both contacts at the same time, but it's possible to get
+  // to this state if a regular 2-gang switch is used as cover switch.
+  if (cluster->open_button->pressed) {
+    cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_CLOSE : MULTISTATE_OPEN);
+  } else if (cluster->close_button->pressed) {
+    cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_OPEN : MULTISTATE_CLOSE);
+  }
 }
 
 void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster) {
