@@ -13,6 +13,20 @@
 #define MAX_MOTOR_POSITION 10000
 
 // ============================================================================
+// Relay timing constraints
+// ============================================================================
+
+// Minimum ON-time after relay closure - prevents breaking the circuit during
+// inrush current peak (Locked Rotor Amps), minimizing arc intensity and
+// preventing contact welding.
+#define RELAY_MIN_ON_TIME_MS 200
+
+// Minimum OFF-time before relay re-energization - allows magnetic field to
+// collapse and motor to decelerate, preventing Back-EMF spikes and mechanical
+// shock to gears.
+#define RELAY_MIN_OFF_TIME_MS 500
+
+// ============================================================================
 // Section 1: Forward declarations
 // ============================================================================
 
@@ -183,6 +197,22 @@ void cover_stop(zigbee_cover_cluster *cluster) {
   if (cluster->calibration && cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
     cover_complete_calibration(cluster);
     return;
+  }
+
+  // Check if relays are currently active and enforce minimum on-time
+  if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED && 
+      cluster->last_relay_on_time > 0) {
+    uint32_t elapsed_since_on = hal_millis() - cluster->last_relay_on_time;
+    if (elapsed_since_on < RELAY_MIN_ON_TIME_MS) {
+      printf("Within minimum relay on-time, queuing stop (elapsed: %ums)\r\n", 
+             elapsed_since_on);
+      
+      // Queue the stop operation
+      cluster->has_pending_movement = 0;  // Clear any pending movement
+      uint32_t remaining_delay = RELAY_MIN_ON_TIME_MS - elapsed_since_on;
+      hal_tasks_schedule(&cluster->safety_delay_task, remaining_delay);
+      return;
+    }
   }
 
   // Cancel any pending tasks
@@ -356,6 +386,7 @@ void cover_execute_movement(zigbee_cover_cluster *cluster, uint8_t target_cover_
            duration_ms);
     relay_on(open_relay);
     relay_off(close_relay);
+    cluster->last_relay_on_time = hal_millis();
   } else {
     printf("Moving CLOSE: %d%% -> %d%% (motor: %u.%02u%% -> %u.%02u%%, duration: %ums)\r\n",
            cluster->position, target_cover_pos,
@@ -364,6 +395,7 @@ void cover_execute_movement(zigbee_cover_cluster *cluster, uint8_t target_cover_
            duration_ms);
     relay_off(open_relay);
     relay_on(close_relay);
+    cluster->last_relay_on_time = hal_millis();
   }
 
   cover_schedule_next_position_update(cluster);
@@ -375,9 +407,66 @@ void cover_safety_delay_handler(void *arg) {
   printf("Safety delay expired\r\n");
   
   if (cluster->has_pending_movement) {
+    // Check if relays are still running (minimum on-time reached, now stop for off-time)
+    if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
+      printf("Stopping relays after minimum on-time, enforcing minimum off-time\r\n");
+      
+      // Cancel movement tasks
+      cover_cancel_movement_tasks(cluster);
+      
+      // Stop both relays
+      relay_off(cluster->open_relay);
+      relay_off(cluster->close_relay);
+      
+      cluster->last_relay_off_time = hal_millis();
+      
+      // Update current position before stopping
+      cover_update_position(cluster);
+      
+      cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
+      hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                         ZCL_CLUSTER_WINDOW_COVERING,
+                                         ZCL_ATTR_WINDOW_COVERING_MOVING);
+      
+      // Now enforce minimum off-time before direction change
+      hal_tasks_schedule(&cluster->safety_delay_task, RELAY_MIN_OFF_TIME_MS);
+      return;
+    }
+    
+    // Relays already stopped and off-time elapsed, execute pending movement
     printf("Executing pending movement to %d%%\r\n", cluster->pending_target_position);
     cluster->has_pending_movement = 0;
     cover_execute_movement(cluster, cluster->pending_target_position);
+  } else {
+    // Pending stop operation - minimum on-time elapsed, safe to stop now
+    printf("Executing pending stop\r\n");
+    
+    // Cancel any remaining tasks
+    cover_cancel_movement_tasks(cluster);
+    
+    // Stop both relays
+    relay_off(cluster->open_relay);
+    relay_off(cluster->close_relay);
+    
+    cluster->last_relay_off_time = hal_millis();
+    
+    // Update current position before stopping
+    if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
+      cover_update_position(cluster);
+    }
+    
+    cluster->moving = ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED;
+    
+    // Send unsolicited position report when stopping
+    hal_zigbee_send_report_attr(cluster->endpoint,
+                                ZCL_CLUSTER_WINDOW_COVERING,
+                                ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE,
+                                ZCL_DATA_TYPE_UINT8,
+                                &cluster->position,
+                                1);
+    hal_zigbee_notify_attribute_changed(cluster->endpoint,
+                                       ZCL_CLUSTER_WINDOW_COVERING,
+                                       ZCL_ATTR_WINDOW_COVERING_MOVING);
   }
 }
 
@@ -402,8 +491,25 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
   uint8_t relays_currently_active = (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED);
   
   if (relays_currently_active) {
-    // Stop relays immediately
-    printf("Stopping for safety delay before direction change\r\n");
+    // Check if relay has been on long enough
+    uint32_t elapsed_since_on = hal_millis() - cluster->last_relay_on_time;
+    
+    if (elapsed_since_on < RELAY_MIN_ON_TIME_MS) {
+      // Need to wait for minimum on-time before stopping
+      uint32_t remaining_on_time = RELAY_MIN_ON_TIME_MS - elapsed_since_on;
+      printf("Relay needs %ums more on-time before stopping (elapsed: %ums)\r\n",
+             remaining_on_time, elapsed_since_on);
+      
+      // Queue the direction change without stopping relays yet
+      // The handler will stop the relay after minimum on-time, then enforce off-time
+      cluster->pending_target_position = target_cover_pos;
+      cluster->has_pending_movement = 1;
+      hal_tasks_schedule(&cluster->safety_delay_task, remaining_on_time);
+      return;
+    }
+    
+    // Relay has been on long enough, safe to stop now
+    printf("Stopping for minimum off-time before direction change\r\n");
     cover_cancel_movement_tasks(cluster);
     relay_off(cluster->open_relay);
     relay_off(cluster->close_relay);
@@ -418,21 +524,21 @@ void cover_goto_position(zigbee_cover_cluster *cluster, uint8_t target_cover_pos
                                        ZCL_CLUSTER_WINDOW_COVERING,
                                        ZCL_ATTR_WINDOW_COVERING_MOVING);
     
-    // Queue the new movement
+    // Queue the new movement after minimum off-time
     cluster->pending_target_position = target_cover_pos;
     cluster->has_pending_movement = 1;
-    hal_tasks_schedule(&cluster->safety_delay_task, 500);
+    hal_tasks_schedule(&cluster->safety_delay_task, RELAY_MIN_OFF_TIME_MS);
     return;
   }
   
-  // Check if we're within safety delay period from last relay-off
+  // Check if we're within minimum off-time from last relay deactivation
   if (cluster->last_relay_off_time > 0) {
     uint32_t elapsed_since_off = hal_millis() - cluster->last_relay_off_time;
-    if (elapsed_since_off < 500) {
-      printf("Within safety delay period, queuing movement (elapsed: %ums)\r\n", elapsed_since_off);
+    if (elapsed_since_off < RELAY_MIN_OFF_TIME_MS) {
+      printf("Within minimum off-time, queuing movement (elapsed: %ums)\r\n", elapsed_since_off);
       cluster->pending_target_position = target_cover_pos;
       cluster->has_pending_movement = 1;
-      uint32_t remaining_delay = 500 - elapsed_since_off;
+      uint32_t remaining_delay = RELAY_MIN_OFF_TIME_MS - elapsed_since_off;
       hal_tasks_schedule(&cluster->safety_delay_task, remaining_delay);
       return;
     }
@@ -471,7 +577,8 @@ void cover_start_calibration_movement(zigbee_cover_cluster *cluster,
   } else {
     relay_on(close_relay);
   }
-
+  
+  cluster->last_relay_on_time = hal_millis();
   cluster->moving = direction;
 
   // Schedule safety timeout (120 seconds)
@@ -643,6 +750,7 @@ void cover_cluster_init(zigbee_cover_cluster *cluster) {
   cluster->start_motor_position = 0;
   cluster->calibration_direction = 0;
   cluster->last_relay_off_time = 0;
+  cluster->last_relay_on_time = 0;
   cluster->pending_target_position = 0;
   cluster->has_pending_movement = 0;
 
@@ -669,8 +777,7 @@ void cover_cluster_init(zigbee_cover_cluster *cluster) {
 
 void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                  uint16_t attribute_id) {
-  switch (attribute_id) {
-  case ZCL_ATTR_WINDOW_COVERING_CALIBRATION:
+  if (attribute_id == ZCL_ATTR_WINDOW_COVERING_CALIBRATION) {
     if (cluster->calibration) {
       printf("Entering calibration mode\r\n");
     } else {
@@ -685,8 +792,9 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                            ZCL_ATTR_WINDOW_COVERING_MOVING);
       }
     }
-    break;
   }
+
+  cover_cluster_store_attrs_to_nv(cluster);
 }
 
 // ============================================================================

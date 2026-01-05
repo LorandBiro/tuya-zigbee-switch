@@ -38,6 +38,7 @@ typedef struct {
   uint16_t start_motor_position;
   uint8_t calibration_direction;
   uint32_t last_relay_off_time;
+  uint32_t last_relay_on_time;
   uint8_t pending_target_position;
   uint8_t has_pending_movement;
   hal_task_t stop_task;

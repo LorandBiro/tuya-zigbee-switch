@@ -190,6 +190,7 @@ def test_immediate_open_button_stops_on_repeat(cover_switch_device: Device):
     # Press should start opening
     cover_switch_device.press_button("A0")
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_OPENING
+    cover_switch_device.step_time(200) # Minimum relay on time
     cover_switch_device.release_button("A0")
 
     # Repeated press should stop the cover
@@ -208,6 +209,7 @@ def test_immediate_close_button_stops_on_repeat(cover_switch_device: Device):
     # Press should start closing
     cover_switch_device.press_button("A1")
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_CLOSING
+    cover_switch_device.step_time(200) # Minimum relay on time
     cover_switch_device.release_button("A1")
 
     # Repeated press should stop the cover
@@ -267,6 +269,7 @@ def test_short_press_open_stops_on_repeat(cover_switch_device: Device):
     cover_switch_device.press_button("A0")
     cover_switch_device.release_button("A0")
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_OPENING
+    cover_switch_device.step_time(200) # Minimum relay on time
 
     # Repeated press and release should stop the cover
     cover_switch_device.press_button("A0")
@@ -286,6 +289,7 @@ def test_short_press_close_stops_on_repeat(cover_switch_device: Device):
     cover_switch_device.press_button("A1")
     cover_switch_device.release_button("A1")
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_CLOSING
+    cover_switch_device.step_time(200) # Minimum relay on time
 
     # Repeated press and release should stop the cover
     cover_switch_device.press_button("A1")
@@ -305,6 +309,7 @@ def test_hybrid_short_open_stops_on_repeat(cover_switch_device: Device):
     cover_switch_device.press_button("A0")
     cover_switch_device.release_button("A0")
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_OPENING
+    cover_switch_device.step_time(200) # Minimum relay on time
 
     # Repeated press and release should stop the cover
     cover_switch_device.press_button("A0")
@@ -324,6 +329,7 @@ def test_hybrid_short_close_stops_on_repeat(cover_switch_device: Device):
     cover_switch_device.press_button("A1")
     cover_switch_device.release_button("A1")
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_CLOSING
+    cover_switch_device.step_time(200) # Minimum relay on time
 
     # Repeated press and release should stop the cover
     cover_switch_device.press_button("A1")
@@ -375,6 +381,7 @@ def test_hybrid_long_opposite_works(cover_switch_device: Device):
     # Wait for safety delay before changing direction
     cover_switch_device.step_time(500)
     assert cover_switch_device.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_CLOSING
+    cover_switch_device.step_time(200) # Minimum relay on time
 
     # Release should stop the cover
     cover_switch_device.release_button("A1")
@@ -390,6 +397,7 @@ def test_cover_switch_detached_mode(toggle_cover_switch: Device):
     # Pressing open button should trigger local cover
     toggle_cover_switch.press_button("A0")
     assert toggle_cover_switch.zcl_cover_get_moving(2) == ZCL_WINDOW_COVERING_MOVING_OPENING
+    toggle_cover_switch.step_time(200) # Minimum relay on time
 
     # Release button should stop the cover
     toggle_cover_switch.release_button("A0")
@@ -412,6 +420,7 @@ def test_cover_switch_index_switching(dual_toggle_cover_switch: Device):
     # Pressing open button should trigger the first cover endpoint
     dual_toggle_cover_switch.press_button("A0")
     assert dual_toggle_cover_switch.zcl_cover_get_moving(3) == ZCL_WINDOW_COVERING_MOVING_OPENING
+    dual_toggle_cover_switch.step_time(200) # Minimum relay on time
 
     # Release button should stop the cover
     dual_toggle_cover_switch.release_button("A0")
@@ -428,6 +437,7 @@ def test_cover_switch_index_switching(dual_toggle_cover_switch: Device):
     # Pressing open button should trigger the second cover endpoint
     dual_toggle_cover_switch.press_button("A0")
     assert dual_toggle_cover_switch.zcl_cover_get_moving(4) == ZCL_WINDOW_COVERING_MOVING_OPENING
+    dual_toggle_cover_switch.step_time(200) # Minimum relay on time
 
     # Release button should stop the cover
     dual_toggle_cover_switch.release_button("A0")
