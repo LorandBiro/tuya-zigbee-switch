@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 typedef struct {
-  uint8_t output_index;
+  uint8_t cover_index;
   uint8_t reversal;
   uint8_t local_mode;
   uint8_t binded_mode;
@@ -20,9 +20,9 @@ typedef struct {
   button_t *open_button;
   button_t *close_button;
   
-  // On/Off Switch Configuration Attributes
+  // Cover Switch Configuration Attributes
   uint8_t switch_type;
-  uint8_t output_index;
+  uint8_t cover_index;
   uint8_t reversal;
   uint8_t local_mode;
   uint8_t binded_mode;

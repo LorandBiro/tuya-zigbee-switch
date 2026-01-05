@@ -306,7 +306,7 @@ const romasku = {
             description: "Mechanical slack at open position (100%) in seconds (0.1s precision)",
             entity_category: "config",
         }),
-    coverSwitchOutputIndex: (name, endpointName, output_cnt) =>
+    coverSwitchCoverIndex: (name, endpointName, output_cnt) =>
         enumLookup({
             name,
             endpointName,
@@ -314,7 +314,7 @@ const romasku = {
                 Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_${i + 1}`, i + 1])
             ),
             cluster: "manuSpecificTuyaCoverSwitchConfig",
-            attribute: "outputIndex",
+            attribute: "coverIndex",
             description: "Which cover to control locally",
             entity_category: "config",
         }),
@@ -381,7 +381,7 @@ const definitions = [
                 manufacturerCode: 0x125D,
                 attributes: {
                     switchType: {ID: 0x0000, type: Zcl.DataType.ENUM8},
-                    outputIndex: {ID: 0x0001, type: Zcl.DataType.UINT8},
+                    coverIndex: {ID: 0x0001, type: Zcl.DataType.UINT8},
                     reversal: {ID: 0x0002, type: Zcl.DataType.BOOLEAN},
                     localMode: {ID: 0x0003, type: Zcl.DataType.ENUM8},
                     bindedMode: {ID: 0x0004, type: Zcl.DataType.ENUM8},
@@ -466,7 +466,7 @@ const definitions = [
             romasku.coverPressAction("press_action", "{{inputName}}"),
             romasku.coverSwitchType("switch_type", "{{inputName}}"),
             {% if device.coverNames %}
-            romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
+            romasku.coverSwitchCoverIndex("cover_index", "{{inputName}}", {{device.coverNames | length}}),
             {% endif %}
             romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
             romasku.coverSwitchLocalMode("local_mode", "{{inputName}}"),

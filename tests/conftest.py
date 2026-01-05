@@ -14,9 +14,11 @@ from tests.zcl_consts import (
     ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_BINDING_MODE,
     ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_MODE,
     ZCL_ATTR_ONOFF_CONFIGURATION_SWITCH_RELAY_MODE,
+    ZCL_ATTR_WINDOW_COVERING_MOVING,
     ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
     ZCL_CLUSTER_ON_OFF,
     ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG,
+    ZCL_CLUSTER_WINDOW_COVERING,
     ZCL_CMD_ONOFF_OFF,
     ZCL_CMD_ONOFF_ON,
 )
@@ -366,6 +368,15 @@ class Device:
             ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE,
         )
         return self.zcl_switch_get_multistate_value(endpoint)
+
+    # Cover helpers:
+    def zcl_cover_get_moving(self, endpoint: int) -> int:
+        """Get the moving state of a cover (0=stopped, 1=opening, 2=closing)."""
+        return int(self.read_zigbee_attr(
+            endpoint,
+            ZCL_CLUSTER_WINDOW_COVERING,
+            ZCL_ATTR_WINDOW_COVERING_MOVING
+        ))
 
 
 def wait_for(

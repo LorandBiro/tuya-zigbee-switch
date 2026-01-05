@@ -198,12 +198,12 @@ void parse_config() {
       hal_gpio_init(close_pin, 1, pull);
 
       buttons[buttons_cnt].pin = open_pin;
-      buttons[buttons_cnt].long_press_duration_ms = 400;
+      buttons[buttons_cnt].long_press_duration_ms = 800;
       buttons[buttons_cnt].multi_press_duration_ms = 800;
       button_t *open_button = &buttons[buttons_cnt++];
 
       buttons[buttons_cnt].pin = close_pin;
-      buttons[buttons_cnt].long_press_duration_ms = 400;
+      buttons[buttons_cnt].long_press_duration_ms = 800;
       buttons[buttons_cnt].multi_press_duration_ms = 800;
       button_t *close_button = &buttons[buttons_cnt++];
 

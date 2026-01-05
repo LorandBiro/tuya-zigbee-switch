@@ -46,9 +46,9 @@ void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluste
 void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
                                          uint16_t attribute_id);
 
-uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode);
+uint8_t cover_switch_cluster_get_cmd(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode, uint8_t moving);
 void cover_switch_cluster_update_present_value(zigbee_cover_switch_cluster *cluster, uint8_t value);
-void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t command);
+void cover_switch_trigger_local_cmd(zigbee_cover_switch_cluster *cluster, uint8_t command);
 
 void cover_switch_cluster_callback_attr_write_trampoline(uint8_t endpoint,
                                                           uint16_t attribute_id) {
@@ -80,8 +80,8 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
                       ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE, ZCL_DATA_TYPE_ENUM8,
                       ATTR_WRITABLE, cluster->switch_type);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 1,
-                      ZCL_ATTR_COVER_SWITCH_CONFIG_OUTPUT_INDEX, ZCL_DATA_TYPE_UINT8,
-                      ATTR_WRITABLE, cluster->output_index);
+                      ZCL_ATTR_COVER_SWITCH_CONFIG_COVER_INDEX, ZCL_DATA_TYPE_UINT8,
+                      ATTR_WRITABLE, cluster->cover_index);
   SETUP_ATTR_FOR_TABLE(cluster->config_attr_infos, 2,
                       ZCL_ATTR_COVER_SWITCH_CONFIG_REVERSAL, ZCL_DATA_TYPE_BOOLEAN,
                       ATTR_WRITABLE, cluster->reversal);
@@ -130,7 +130,7 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
   endpoint->cluster_count++;
 }
 
-uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode) {
+uint8_t cover_switch_cluster_get_cmd(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode, uint8_t moving) {
   if (mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_DETACHED) {
     return 0xFF;
   }
@@ -147,27 +147,28 @@ uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, ui
     }
   }
   else {
+    uint8_t cmd = 0xFF;
     switch (mode) {
     case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START:
       if (present_value == MULTISTATE_OPEN) {
-        return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+        cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
       } else if (present_value == MULTISTATE_CLOSE) {
-        return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+        cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
       }
       break;
     case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_LONG_PRESS:
       if (present_value == MULTISTATE_LONG_OPEN) {
-        return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+        cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
       } else if (present_value == MULTISTATE_LONG_CLOSE) {
-        return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+        cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
       }
       break;
     case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_PRESS:
       if (present_value == MULTISTATE_RELEASED) {
         if (cluster->present_value == MULTISTATE_OPEN) {
-          return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+          cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
         } else if (cluster->present_value == MULTISTATE_CLOSE) {
-          return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+          cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
         }
       }
       break;
@@ -178,9 +179,9 @@ uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, ui
         return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
       } else if (present_value == MULTISTATE_RELEASED) {
         if (cluster->present_value == MULTISTATE_OPEN) {
-          return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+          cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
         } else if (cluster->present_value == MULTISTATE_CLOSE) {
-          return ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+          cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
         } else if (cluster->present_value == MULTISTATE_LONG_OPEN ||
                   cluster->present_value == MULTISTATE_LONG_CLOSE) {
           return ZCL_CMD_WINDOW_COVERING_STOP;
@@ -188,9 +189,20 @@ uint8_t cover_switch_cluster_get_action(zigbee_cover_switch_cluster *cluster, ui
       }
       break;
     }
+
+    // Momentary switches send STOP command on repeated presses
+    if (cmd != 0xFF) {
+      if (cmd == ZCL_CMD_WINDOW_COVERING_UP_OPEN && moving == ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING) {
+        return ZCL_CMD_WINDOW_COVERING_STOP;
+      } else if (cmd == ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE && moving == ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING) {
+        return ZCL_CMD_WINDOW_COVERING_STOP;
+      }
+
+      return cmd;
+    }
   }
 
-  printf("No action found for present value %d->%d with type %d and mode %d\r\n",
+  printf("No command found for present value %d->%d with type %d and mode %d\r\n",
     cluster->present_value,
     present_value,
     cluster->switch_type,
@@ -203,28 +215,37 @@ void cover_switch_cluster_update_present_value(zigbee_cover_switch_cluster *clus
     return;
   }
 
-  uint8_t local_action = cover_switch_cluster_get_action(cluster, present_value, cluster->local_mode);
-  uint8_t binded_action = cover_switch_cluster_get_action(cluster, present_value, cluster->binded_mode);
+  uint8_t local_cmd = 0xFF;
+  uint8_t binded_cmd = 0xFF;
+  if (cluster->cover_index != 0 && cluster->cover_index <= cover_clusters_cnt) {
+    zigbee_cover_cluster *output = &cover_clusters[cluster->cover_index - 1];
+    local_cmd = cover_switch_cluster_get_cmd(cluster, present_value, cluster->local_mode, output->moving);
+    if (cluster->local_mode == cluster->binded_mode) {
+      binded_cmd = local_cmd;
+    }
+  }
+
+  if (binded_cmd == 0xFF) {
+    binded_cmd = cover_switch_cluster_get_cmd(cluster, present_value, cluster->binded_mode, ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED);
+  }
 
   cluster->present_value = present_value;
   hal_zigbee_notify_attribute_changed(cluster->endpoint, 
                                       ZCL_CLUSTER_MULTISTATE_INPUT_BASIC,
                                       ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE);
 
-  if (local_action != 0xFF) {
-    cover_switch_trigger_output(cluster, local_action);
+  if (local_cmd != 0xFF) {
+    cover_switch_trigger_local_cmd(cluster, local_cmd);
   }
 }
 
-void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t action) {
-  if (cluster->output_index == 0 || cluster->output_index > cover_clusters_cnt) {
+void cover_switch_trigger_local_cmd(zigbee_cover_switch_cluster *cluster, uint8_t cmd) {
+  if (cluster->cover_index == 0 || cluster->cover_index > cover_clusters_cnt) {
     return;
   }
 
-  zigbee_cover_cluster *output = 
-      &cover_clusters[cluster->output_index - 1];
-
-  switch (action) {
+  zigbee_cover_cluster *output = &cover_clusters[cluster->cover_index - 1];
+  switch (cmd) {
   case ZCL_CMD_WINDOW_COVERING_UP_OPEN:
     cover_open(output);
     break;
@@ -235,7 +256,7 @@ void cover_switch_trigger_output(zigbee_cover_switch_cluster *cluster, uint8_t a
     cover_stop(output);
     break;
   default:
-    printf("Unknown action %d\r\n", action);
+    printf("Unknown cmd %d\r\n", cmd);
     break;
   }
 }
@@ -308,21 +329,15 @@ void cover_switch_cluster_on_button_multi_press(zigbee_cover_switch_cluster *clu
 
 void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster) {
   cluster->switch_type = ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_MOMENTARY; // Default to momentary
-  cluster->output_index = cluster->cover_switch_idx + 1;
+  cluster->cover_index = cluster->cover_switch_idx + 1;
   cluster->reversal = 0;
   cluster->local_mode = ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS;
   cluster->binded_mode = ZCL_COVER_SWITCH_CONFIG_BINDED_MODE_SHORT_AND_LONG_PRESS;
-  
-  // Set initial action based on switch type
-  if (cluster->switch_type == ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_TOGGLE) {
-    cluster->present_value = MULTISTATE_STOP;
-  } else {
-    cluster->present_value = MULTISTATE_RELEASED;
-  }
+  cluster->present_value = MULTISTATE_RELEASED;
 }
 
 void cover_switch_cluster_store_attrs_to_nv(zigbee_cover_switch_cluster *cluster) {
-  nv_config_buffer.output_index = cluster->output_index;
+  nv_config_buffer.cover_index = cluster->cover_index;
   nv_config_buffer.reversal = cluster->reversal;
   nv_config_buffer.local_mode = cluster->local_mode;
   nv_config_buffer.binded_mode = cluster->binded_mode;
@@ -344,7 +359,7 @@ void cover_switch_cluster_load_attrs_from_nv(zigbee_cover_switch_cluster *cluste
     return;
   }
   
-  cluster->output_index = nv_config_buffer.output_index;
+  cluster->cover_index = nv_config_buffer.cover_index;
   cluster->reversal = nv_config_buffer.reversal;
   cluster->local_mode = nv_config_buffer.local_mode;
   cluster->binded_mode = nv_config_buffer.binded_mode;
@@ -366,7 +381,7 @@ void cover_switch_cluster_on_write_attr(zigbee_cover_switch_cluster *cluster,
                                         ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE);
     cover_switch_cluster_store_attrs_to_nv(cluster);
     break;
-  case ZCL_ATTR_COVER_SWITCH_CONFIG_OUTPUT_INDEX:
+  case ZCL_ATTR_COVER_SWITCH_CONFIG_COVER_INDEX:
   case ZCL_ATTR_COVER_SWITCH_CONFIG_REVERSAL:
   case ZCL_ATTR_COVER_SWITCH_CONFIG_LOCAL_MODE:
   case ZCL_ATTR_COVER_SWITCH_CONFIG_BINDED_MODE:
