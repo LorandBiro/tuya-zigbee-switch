@@ -670,49 +670,11 @@ void cover_cluster_init(zigbee_cover_cluster *cluster) {
 void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                  uint16_t attribute_id) {
   switch (attribute_id) {
-  case ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL:
-  case ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME:
-  case ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK:
-  case ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK:
-    cover_cluster_store_attrs_to_nv(cluster);
-    // Send unsolicited reports for these config changes
-    if (attribute_id == ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL) {
-      hal_zigbee_send_report_attr(cluster->endpoint,
-                                  ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL,
-                                  ZCL_DATA_TYPE_BOOLEAN, &cluster->motor_reversal, 1);
-    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME) {
-      hal_zigbee_send_report_attr(
-          cluster->endpoint, ZCL_CLUSTER_WINDOW_COVERING,
-          ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME, ZCL_DATA_TYPE_UINT16,
-          &cluster->calibration_time, 2);
-    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK) {
-      hal_zigbee_send_report_attr(cluster->endpoint,
-                                  ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK,
-                                  ZCL_DATA_TYPE_UINT16, &cluster->closed_slack, 2);
-    } else if (attribute_id == ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK) {
-      hal_zigbee_send_report_attr(cluster->endpoint,
-                                  ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK,
-                                  ZCL_DATA_TYPE_UINT16, &cluster->open_slack,
-                                  2);
-    }
-    break;
-
   case ZCL_ATTR_WINDOW_COVERING_CALIBRATION:
-    // Calibration attribute written - enter/exit calibration mode
     if (cluster->calibration) {
       printf("Entering calibration mode\r\n");
-      // Send unsolicited report
-      uint8_t calib_val = 1;
-      hal_zigbee_send_report_attr(cluster->endpoint,
-                                  ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_CALIBRATION,
-                                  ZCL_DATA_TYPE_BOOLEAN, &calib_val, 1);
     } else {
       printf("Exiting calibration mode\r\n");
-      // If currently moving, stop
       if (cluster->moving != ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED) {
         cover_cancel_movement_tasks(cluster);
         relay_off(cluster->open_relay);
@@ -722,12 +684,6 @@ void cover_cluster_on_write_attr(zigbee_cover_cluster *cluster,
                                            ZCL_CLUSTER_WINDOW_COVERING,
                                            ZCL_ATTR_WINDOW_COVERING_MOVING);
       }
-      // Send unsolicited report
-      uint8_t calib_val = 0;
-      hal_zigbee_send_report_attr(cluster->endpoint,
-                                  ZCL_CLUSTER_WINDOW_COVERING,
-                                  ZCL_ATTR_WINDOW_COVERING_CALIBRATION,
-                                  ZCL_DATA_TYPE_BOOLEAN, &calib_val, 1);
     }
     break;
   }
