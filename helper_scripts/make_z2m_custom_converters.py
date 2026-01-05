@@ -41,6 +41,8 @@ if __name__ == "__main__":
 
         relay_cnt = 0
         switch_cnt = 0
+        cover_switch_cnt = 0
+        cover_cnt = 0
         indicators_cnt = 0
         has_dedicated_net_led = False
         for peripheral in peripherals:
@@ -50,35 +52,72 @@ if __name__ == "__main__":
                 relay_cnt += 1
             if peripheral[0] == 'S':
                 switch_cnt += 1
+            if peripheral[0] == 'X':
+                cover_switch_cnt += 1
+            if peripheral[0] == 'W':
+                cover_cnt += 1
             if peripheral[0] == 'I':
                 indicators_cnt += 1
             if peripheral[0] == 'L':
                 has_dedicated_net_led = True
         
+        # Generate switch names
         if switch_cnt == 1:
             switch_names = ["switch"]
         elif switch_cnt == 2:
             switch_names = ["switch_left", "switch_right"]
         elif switch_cnt == 3:
             switch_names = ["switch_left", "switch_middle", "switch_right"]
+        elif switch_cnt > 0:
+            switch_names = [f"switch_{index}" for index in range(switch_cnt)]
         else:
-            switch_names = [f"switch_{index}" for index in range(relay_cnt)]
+            switch_names = []
 
+        # Generate relay names
         if relay_cnt == 1:
             relay_names = ["relay"]
         elif relay_cnt == 2:
             relay_names = ["relay_left", "relay_right"]
         elif relay_cnt == 3:
             relay_names = ["relay_left", "relay_middle", "relay_right"]
-        else:
+        elif relay_cnt > 0:
             relay_names = [f"relay_{index}" for index in range(relay_cnt)]
-
+        else:
+            relay_names = []
+        
+        # Generate cover switch names
+        if cover_switch_cnt == 1:
+            cover_switch_names = ["cover_switch"]
+        elif cover_switch_cnt == 2:
+            cover_switch_names = ["cover_switch_left", "cover_switch_right"]
+        elif cover_switch_cnt == 3:
+            cover_switch_names = ["cover_switch_left", "cover_switch_middle", "cover_switch_right"]
+        elif cover_switch_cnt > 0:
+            cover_switch_names = [f"cover_switch_{i+1}" for i in range(cover_switch_cnt)]
+        else:
+            cover_switch_names = []
+        
+        # Generate cover names
+        if cover_cnt == 1:
+            cover_names = ["cover"]
+        elif cover_cnt == 2:
+            cover_names = ["cover_left", "cover_right"]
+        elif cover_cnt == 3:
+            cover_names = ["cover_left", "cover_middle", "cover_right"]
+        elif cover_cnt > 0:
+            cover_names = [f"cover_{i+1}" for i in range(cover_cnt)]
+        else:
+            cover_names = []
+        
+        # Create unified device dict with all peripherals
         devices.append({
             "zb_models": [zb_model] + (device.get("old_zb_models") or []),
             "model": device.get("override_z2m_device") or device["stock_converter_model"],
             "switchNames": switch_names,
             "relayNames": relay_names,
             "relayIndicatorNames": relay_names[:indicators_cnt],
+            "coverSwitchNames": cover_switch_names,
+            "coverNames": cover_names,
             "has_dedicated_net_led": has_dedicated_net_led,
         })
 

@@ -1,8 +1,8 @@
 import pytest
 
-from tests.client import StubProc
-from tests.conftest import Device
-from tests.zcl_consts import (
+from client import StubProc
+from conftest import Device
+from zcl_consts import (
     ZCL_ATTR_BASIC_MFR_NAME,
     ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE,
     ZCL_ATTR_ONOFF,
@@ -21,6 +21,8 @@ def test_endpoints_layout_matches_config(device: Device, device_config: str):
     parts = [p for p in device_config.split(";") if p]
     num_switches = sum(1 for p in parts[2:] if p.startswith("S"))
     num_relays = sum(1 for p in parts[2:] if p.startswith("R"))
+    num_cover_switches = sum(1 for p in parts[2:] if p.startswith("X"))
+    num_covers = sum(1 for p in parts[2:] if p.startswith("W"))
 
     # For each switch endpoint, check presence of clusters
     for ep in range(1, num_switches + 1):
@@ -54,6 +56,8 @@ def test_endpoints_layout_matches_config(device: Device, device_config: str):
         "Manu;Model;",  # minimal
         "X;Y;SA0u;LB1;RB2;",  # dedicated status LED + one switch/relay
         "X;Y;SA0u;IB0;RB1;",  # indicator LED for relays
+        "Mfr;Model;XA0A1u;WB0B1;",  # cover switch + output pair
+        "Mfr;Model;SA0u;RA1;XB0B1u;WC0C1;",  # mixed: switch/relay + cover
     ],
 )
 def test_various_configs_boot(cfg: str):

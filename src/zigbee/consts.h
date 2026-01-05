@@ -13,6 +13,8 @@
 #define ZCL_CLUSTER_LEVEL_CONTROL                     0x0008
 #define ZCL_CLUSTER_GROUPS                            0x0004
 #define ZCL_CLUSTER_OTA_BOOTLOAD                      0x0019
+#define ZCL_CLUSTER_WINDOW_COVERING                   0x0102
+#define ZCL_CLUSTER_COVER_SWITCH_CONFIG               0xFC01
 
 
 // Attributes
@@ -63,7 +65,9 @@
 
 // Multistate cluster
 
+#define ZCL_ATTR_MULTISTATE_INPUT_DESCRIPTION         0x001C
 #define ZCL_ATTR_MULTISTATE_INPUT_NUMBER_OF_STATES    0x004A
+#define ZCL_ATTR_MULTISTATE_INPUT_NUM_OF_STATES       0x004A
 #define ZCL_ATTR_MULTISTATE_INPUT_OUT_OF_SERVICE      0x0051
 #define ZCL_ATTR_MULTISTATE_INPUT_PRESENT_VALUE       0x0055
 #define ZCL_ATTR_MULTISTATE_INPUT_STATUS_FLAGS        0x006F
@@ -72,6 +76,24 @@
 // Groups cluster
 
 #define ZCL_ATTR_GROUP_NAME_SUPPORT                     0x0000
+
+// WindowCovering cluster
+#define ZCL_ATTR_WINDOW_COVERING_TYPE                               0x0000
+#define ZCL_ATTR_WINDOW_COVERING_CURRENT_POSITION_LIFT_PERCENTAGE   0x0008
+#define ZCL_ATTR_WINDOW_COVERING_MOVING                             0xff06
+#define ZCL_ATTR_WINDOW_COVERING_MOTOR_REVERSAL                     0xff07
+#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION                        0xff08
+#define ZCL_ATTR_WINDOW_COVERING_CALIBRATION_TIME                   0xff09
+#define ZCL_ATTR_WINDOW_COVERING_CLOSED_SLACK                       0xff0a
+#define ZCL_ATTR_WINDOW_COVERING_OPEN_SLACK                         0xff0b
+
+// Cover Switch Configuration cluster
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_SWITCH_TYPE       0x0000
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_COVER_INDEX       0x0001
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_REVERSAL          0x0002
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_LOCAL_MODE        0x0003
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_BINDED_MODE       0x0004
+#define ZCL_ATTR_COVER_SWITCH_CONFIG_LONG_PRESS_DUR    0x0005
 
 // OTA cluster
 
@@ -127,6 +149,19 @@
 #define ZCL_LEVEL_MOVE_UP                                     0x00
 #define ZCL_LEVEL_MOVE_DOWN                                   0x01
 
+// WindowCovering cluster
+
+#define ZCL_ATTR_WINDOW_COVERING_MOVING_STOPPED 0x00
+#define ZCL_ATTR_WINDOW_COVERING_MOVING_OPENING 0x01
+#define ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING 0x02
+
+// Cover Switch Configuration cluster
+
+#define ZCL_COVER_SWITCH_MODE_IMMEDIATE     0x00
+#define ZCL_COVER_SWITCH_MODE_SHORT_PRESS   0x01
+#define ZCL_COVER_SWITCH_MODE_LONG_PRESS    0x02
+#define ZCL_COVER_SWITCH_MODE_HYBRID        0x03
+
 // Commands
 
 // OnOff Cluster
@@ -148,6 +183,22 @@
 #define ZCL_CMD_LEVEL_MOVE_WITH_ON_OFF                    0x05
 #define ZCL_CMD_LEVEL_STEP_WITH_ON_OFF                    0x06
 #define ZCL_CMD_LEVEL_STOP_WITH_ON_OFF                    0x07
+
+// WindowCovering Cluster
+
+#define ZCL_CMD_WINDOW_COVERING_UP_OPEN                    0x00
+#define ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE                 0x01
+#define ZCL_CMD_WINDOW_COVERING_STOP                       0x02
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_VALUE           0x04
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_LIFT_PERCENTAGE      0x05
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_TILT_VALUE           0x07
+#define ZCL_CMD_WINDOW_COVERING_GO_TO_TILT_PERCENTAGE      0x08
+
+// WindowCovering Mode bitmap values
+#define ZCL_WINDOW_COVERING_MODE_MOTOR_REVERSED            0x01
+#define ZCL_WINDOW_COVERING_MODE_CALIBRATION               0x02
+#define ZCL_WINDOW_COVERING_MODE_MAINTENANCE               0x04
+#define ZCL_WINDOW_COVERING_MODE_LED_DISABLED              0x08
 
 // OTA Cluster
 

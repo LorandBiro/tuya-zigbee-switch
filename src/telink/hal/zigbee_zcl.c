@@ -4,6 +4,8 @@
 #include "zcl_include.h"
 #include "zcl_multistate_input.h"
 #include "zcl_onoff_configuration.h"
+#include "zcl_cover_switch_config.h"
+#include "zcl_window_covering_custom.h"
 #pragma pack(pop)
 
 #include "telink_size_t_hack.h"
@@ -47,10 +49,17 @@ static cluster_registerFunc_t get_register_func_by_cluster_id(u16 cluster_id) {
       ZCL_CLUSTER_GEN_MULTISTATE_INPUT_BASIC) { // Multistate Input
     return zcl_multistate_input_register;
   }
+  if (cluster_id == ZCL_CLUSTER_CLOSURES_WINDOW_COVERING) { // Window Covering
+    // Use custom registration to support all commands including GO_TO_LIFT_PERCENTAGE
+    return zcl_windowCovering_custom_register;
+  }
+  if (cluster_id == 0xFC01) { // Cover Switch Config
+    return zcl_cover_switch_config_register;
+  }
   return NULL;
 }
 
-static status_t cmd_callback(u8 endpoint, u8 clusterId, u8 cmdId,
+static status_t cmd_callback(u8 endpoint, u16 clusterId, u8 cmdId,
                              void *cmdPayload) {
   hal_zigbee_cluster *cluster = hal_zigbee_find_cluster(
       hal_endpoints, hal_endpoints_cnt, endpoint, clusterId);
@@ -66,9 +75,18 @@ static status_t cmd_callback_on_off(zclIncomingAddrInfo_t *pAddrInfo, u8 cmdId,
                       cmdPayload);
 }
 
+static status_t cmd_callback_window_covering(zclIncomingAddrInfo_t *pAddrInfo, u8 cmdId,
+                                              void *cmdPayload) {
+  return cmd_callback(pAddrInfo->dstEp, ZCL_CLUSTER_CLOSURES_WINDOW_COVERING, cmdId,
+                      cmdPayload);
+}
+
 static cluster_forAppCb_t get_cmd_callback_by_cluster_id(u16 cluster_id) {
   if (cluster_id == ZCL_CLUSTER_GEN_ON_OFF) { // On/Off cluster
     return cmd_callback_on_off;
+  }
+  if (cluster_id == ZCL_CLUSTER_CLOSURES_WINDOW_COVERING) { // Window Covering cluster
+    return cmd_callback_window_covering;
   }
   return NULL;
 }
@@ -166,7 +184,7 @@ void telink_zigbee_hal_zcl_init(hal_zigbee_endpoint *endpoints,
   }
 }
 
-void hal_zigbee_notify_attribute_changed(uint8_t endpoint, uint8_t cluster_id,
+void hal_zigbee_notify_attribute_changed(uint8_t endpoint, uint16_t cluster_id,
                                          uint16_t attribute_id) {
   report_handler(); // Trigger reporting if needed
 }

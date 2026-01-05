@@ -1,10 +1,12 @@
 #include "basic_cluster.h"
 #include "consts.h"
+#include "cover_cluster.h"
+#include "cover_switch_cluster.h"
 #include "hal/printf_selector.h"
 #include "relay_cluster.h"
 #include "switch_cluster.h"
 
-static void zigbee_on_attr_change(uint8_t endpoint, uint8_t cluster_id,
+static void zigbee_on_attr_change(uint8_t endpoint, uint16_t cluster_id,
                                   uint16_t attribute_id) {
   printf("Attribute changed, ep: %d, cluster: %d, attr: %d\r\n", endpoint,
          cluster_id, attribute_id);
@@ -12,8 +14,12 @@ static void zigbee_on_attr_change(uint8_t endpoint, uint8_t cluster_id,
     basic_cluster_callback_attr_write_trampoline(attribute_id);
   } else if (cluster_id == ZCL_CLUSTER_ON_OFF_SWITCH_CONFIG) {
     switch_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
+  } else if (cluster_id == ZCL_CLUSTER_COVER_SWITCH_CONFIG) {
+    cover_switch_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
   } else if (cluster_id == ZCL_CLUSTER_ON_OFF) {
     relay_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
+  } else if (cluster_id == ZCL_CLUSTER_WINDOW_COVERING) {
+    cover_cluster_callback_attr_write_trampoline(endpoint, attribute_id);
   }
 }
 

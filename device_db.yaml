@@ -2810,3 +2810,29 @@ ZBMINIL2:
   threads: https://github.com/romasku/tuya-zigbee-switch/pull/232
   store:
   - https://sonoff.tech/products/sonoff-zbmini-extreme-zigbee-smart-switch-zbminil2
+GIRIER_TS130F_DUAL:
+  human_name: Girier TS130F Dual Curtain Controller
+  category: module
+  power: mains
+  neutral: required
+  device_type: router
+  tuya_model_name: TS130F
+  tuya_manufacturer_name: _TZ3000_j1xl73iw
+  stock_converter_manufacturer: Lonsonho
+  stock_converter_model: TS130F_dual
+  override_z2m_device: TS130F_GIRIER_DUAL
+  tuya_module: ZTU
+  mcu_family: Telink
+  mcu: TLSR8258
+  config_str: j1xl73iw;TS130F-GIR-DUAL;LC1;XB4D2u;WC0C4;XC3C2u;WD4D7;
+  alt_config_str: null
+  old_manufacturer_names: null
+  old_zb_models: null
+  tuya_manufacturer_id: 4417
+  tuya_image_type: 54179
+  firmware_image_type: 45597
+  build: yes
+  status: in_progress
+  info: Basic cover support - OPEN/CLOSE/STOP only. The on-board button shares pin with first switch.
+  threads: https://github.com/romasku/tuya-zigbee-switch/issues/270
+  store: https://www.aliexpress.com/item/1005003864471089.html
