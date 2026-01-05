@@ -465,7 +465,9 @@ const definitions = [
             {% for inputName in device.coverSwitchNames %}
             romasku.coverPressAction("press_action", "{{inputName}}"),
             romasku.coverSwitchType("switch_type", "{{inputName}}"),
+            {% if device.coverNames %}
             romasku.coverSwitchOutputIndex("output_index", "{{inputName}}", {{device.coverNames | length}}),
+            {% endif %}
             romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
             romasku.coverSwitchLocalMode("local_mode", "{{inputName}}"),
             romasku.coverSwitchBindedMode("binded_mode", "{{inputName}}"),
