@@ -310,12 +310,13 @@ const romasku = {
         enumLookup({
             name,
             endpointName,
-            lookup: Object.fromEntries(
-                Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_${i + 1}`, i + 1])
-            ),
+            lookup: Object.fromEntries([
+                ['detached', 0],
+                ...Array.from({ length: output_cnt || 2 }, (_, i) => [`cover_${i + 1}`, i + 1])
+            ]),
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "coverIndex",
-            description: "Which cover to control locally",
+            description: "Which cover to control locally (detached = no local control)",
             entity_category: "config",
         }),
     coverSwitchInvert: (name, endpointName) =>
@@ -334,7 +335,7 @@ const romasku = {
         enumLookup({
             name,
             endpointName,
-            lookup: { detached: 0, press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
+            lookup: { immediate: 0, short_press: 1, long_press: 2, hybrid: 3 },
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "localMode",
             description: "When to trigger local cover",
@@ -344,7 +345,7 @@ const romasku = {
         enumLookup({
             name,
             endpointName,
-            lookup: { press_start: 1, long_press: 2, short_press: 3, short_and_long: 4 },
+            lookup: { immediate: 0, short_press: 1, long_press: 2, hybrid: 3 },
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "bindedMode",
             description: "When to send commands to bound devices",

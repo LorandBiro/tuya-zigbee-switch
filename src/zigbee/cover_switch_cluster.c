@@ -131,10 +131,6 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
 }
 
 uint8_t cover_switch_cluster_get_cmd(zigbee_cover_switch_cluster *cluster, uint8_t present_value, uint8_t mode, uint8_t moving) {
-  if (mode == ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_DETACHED) {
-    return 0xFF;
-  }
-
   if (present_value == MULTISTATE_STOP) {
     return ZCL_CMD_WINDOW_COVERING_STOP;
   }
@@ -149,30 +145,30 @@ uint8_t cover_switch_cluster_get_cmd(zigbee_cover_switch_cluster *cluster, uint8
   else {
     uint8_t cmd = 0xFF;
     switch (mode) {
-    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_PRESS_START:
+    case ZCL_COVER_SWITCH_MODE_IMMEDIATE:
       if (present_value == MULTISTATE_OPEN) {
         cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
       } else if (present_value == MULTISTATE_CLOSE) {
         cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
       }
       break;
-    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_LONG_PRESS:
+      case ZCL_COVER_SWITCH_MODE_SHORT_PRESS:
+        if (present_value == MULTISTATE_RELEASED) {
+          if (cluster->present_value == MULTISTATE_OPEN) {
+            cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
+          } else if (cluster->present_value == MULTISTATE_CLOSE) {
+            cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
+          }
+        }
+        break;
+    case ZCL_COVER_SWITCH_MODE_LONG_PRESS:
       if (present_value == MULTISTATE_LONG_OPEN) {
         cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
       } else if (present_value == MULTISTATE_LONG_CLOSE) {
         cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
       }
       break;
-    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_PRESS:
-      if (present_value == MULTISTATE_RELEASED) {
-        if (cluster->present_value == MULTISTATE_OPEN) {
-          cmd = ZCL_CMD_WINDOW_COVERING_UP_OPEN;
-        } else if (cluster->present_value == MULTISTATE_CLOSE) {
-          cmd = ZCL_CMD_WINDOW_COVERING_DOWN_CLOSE;
-        }
-      }
-      break;
-    case ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS:
+    case ZCL_COVER_SWITCH_MODE_HYBRID:
       if (present_value == MULTISTATE_LONG_OPEN) {
         return ZCL_CMD_WINDOW_COVERING_UP_OPEN;
       } else if (present_value == MULTISTATE_LONG_CLOSE) {
@@ -202,11 +198,6 @@ uint8_t cover_switch_cluster_get_cmd(zigbee_cover_switch_cluster *cluster, uint8
     }
   }
 
-  printf("No command found for present value %d->%d with type %d and mode %d\r\n",
-    cluster->present_value,
-    present_value,
-    cluster->switch_type,
-    mode);
   return 0xFF;
 }
 
@@ -331,8 +322,8 @@ void cover_switch_cluster_init(zigbee_cover_switch_cluster *cluster) {
   cluster->switch_type = ZCL_ONOFF_CONFIGURATION_SWITCH_TYPE_MOMENTARY; // Default to momentary
   cluster->cover_index = cluster->cover_switch_idx + 1;
   cluster->reversal = 0;
-  cluster->local_mode = ZCL_COVER_SWITCH_CONFIG_LOCAL_MODE_SHORT_AND_LONG_PRESS;
-  cluster->binded_mode = ZCL_COVER_SWITCH_CONFIG_BINDED_MODE_SHORT_AND_LONG_PRESS;
+  cluster->local_mode = ZCL_COVER_SWITCH_MODE_HYBRID;
+  cluster->binded_mode = ZCL_COVER_SWITCH_MODE_HYBRID;
   cluster->present_value = MULTISTATE_RELEASED;
 }
 
