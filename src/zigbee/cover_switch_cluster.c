@@ -11,6 +11,8 @@
 #include "cover_cluster.h"
 #include "zigbee_commands.h"
 
+#define MULTI_PRESS_CNT_TO_RESET 10
+
 #define MULTISTATE_RELEASED 0
 #define MULTISTATE_OPEN 1
 #define MULTISTATE_CLOSE 2
@@ -31,6 +33,8 @@ extern uint8_t relay_clusters_cnt;
 void cover_switch_cluster_on_button_press(zigbee_cover_switch_cluster *cluster);
 void cover_switch_cluster_on_button_release(zigbee_cover_switch_cluster *cluster);
 void cover_switch_cluster_on_button_long_press(zigbee_cover_switch_cluster *cluster);
+void cover_switch_cluster_on_button_multi_press(zigbee_cover_switch_cluster *cluster,
+                                                 uint8_t press_count);
 
 zigbee_cover_switch_cluster *cover_switch_cluster_by_endpoint[10];
 
@@ -62,11 +66,13 @@ void cover_switch_cluster_add_to_endpoint(zigbee_cover_switch_cluster *cluster,
   cluster->open_button->on_press = (ev_button_callback_t)cover_switch_cluster_on_button_press;
   cluster->open_button->on_release = (ev_button_callback_t)cover_switch_cluster_on_button_release;
   cluster->open_button->on_long_press = (ev_button_callback_t)cover_switch_cluster_on_button_long_press;
+  cluster->open_button->on_multi_press = (ev_button_multi_press_callback_t)cover_switch_cluster_on_button_multi_press;
   cluster->open_button->callback_param = cluster;
 
   cluster->close_button->on_press = (ev_button_callback_t)cover_switch_cluster_on_button_press;
   cluster->close_button->on_release = (ev_button_callback_t)cover_switch_cluster_on_button_release;
   cluster->close_button->on_long_press = (ev_button_callback_t)cover_switch_cluster_on_button_long_press;
+  cluster->close_button->on_multi_press = (ev_button_multi_press_callback_t)cover_switch_cluster_on_button_multi_press;
   cluster->close_button->callback_param = cluster;
 
   // Configuration attributes on CoverSwitchConfig SERVER cluster (manufacturer-specific)
@@ -287,6 +293,16 @@ void cover_switch_cluster_on_button_release(zigbee_cover_switch_cluster *cluster
     cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_CLOSE : MULTISTATE_OPEN);
   } else if (cluster->close_button->pressed) {
     cover_switch_cluster_update_present_value(cluster, cluster->reversal ? MULTISTATE_OPEN : MULTISTATE_CLOSE);
+  }
+}
+
+// TODO: This is duplicated from switch_cluster.c. It would be best to move it to a shared
+// location (e.g., cluster_common.h) to avoid duplication, but keeping it separate for
+// now to minimize the scope of changes and simplify review.
+void cover_switch_cluster_on_button_multi_press(zigbee_cover_switch_cluster *cluster,
+                                                 uint8_t press_count) {
+  if (press_count > MULTI_PRESS_CNT_TO_RESET) {
+    hal_factory_reset();
   }
 }
 

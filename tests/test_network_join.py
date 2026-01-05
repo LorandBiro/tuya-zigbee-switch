@@ -60,13 +60,36 @@ def test_led_blinks_after_kicked() -> None:
             state = not state
 
 
-def test_leaves_on_multipress() -> None:
+def test_leaves_on_switch_multipress() -> None:
     with StubProc(device_config="A;B;SA0u;RB1;") as proc:
         device = Device(proc)
         assert device.status()["joined"] == str(HAL_ZIGBEE_NETWORK_JOINED)
 
         for _ in range(11):
             device.click_button("A0")
+            device.step_time(60)
+
+        assert device.status()["joined"] != str(HAL_ZIGBEE_NETWORK_JOINED)
+
+def test_leaves_on_cover_switch_open_multipress():
+    with StubProc(device_config="A;B;XA0A1u;WB0B1;") as proc:
+        device = Device(proc)
+        assert device.status()["joined"] == str(HAL_ZIGBEE_NETWORK_JOINED)
+
+        for _ in range(11):
+            device.click_button("A0")
+            device.step_time(60)
+
+        assert device.status()["joined"] != str(HAL_ZIGBEE_NETWORK_JOINED)
+
+
+def test_close_button_multi_press_factory_reset():
+    with StubProc(device_config="A;B;XA0A1u;WB0B1;") as proc:
+        device = Device(proc)
+        assert device.status()["joined"] == str(HAL_ZIGBEE_NETWORK_JOINED)
+
+        for _ in range(11):
+            device.click_button("A1")
             device.step_time(60)
 
         assert device.status()["joined"] != str(HAL_ZIGBEE_NETWORK_JOINED)
