@@ -457,7 +457,9 @@ const definitions = [
             romasku.coverSwitchCoverIndex("cover_index", "{{inputName}}", {{device.coverNames | length}}),
             {% endif %}
             romasku.coverSwitchInvert("cover_invert", "{{inputName}}"),
+            {% if device.coverNames %}
             romasku.coverSwitchLocalMode("local_mode", "{{inputName}}"),
+            {% endif %}
             romasku.coverSwitchBindedMode("binded_mode", "{{inputName}}"),
             romasku.coverSwitchLongPressDuration("long_press_duration", "{{inputName}}"),
             {% endfor %}
