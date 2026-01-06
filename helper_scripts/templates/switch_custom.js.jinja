@@ -140,6 +140,7 @@ const romasku = {
             attribute: {ID: 0xff01, type: 0x10},  // Boolean
             description: "State of the network indicator LED",
             access: "ALL",
+            entityCategory: "config"
         }),
     deviceConfig: (name, endpointName) =>
         text({
@@ -198,7 +199,7 @@ const romasku = {
                     }
                 }
             },
-            entity_category: "diagnostic"
+            entityCategory: "config"
         }),
     // Cover-specific definitions
     coverPressAction: (name, endpointName) =>
@@ -217,6 +218,7 @@ const romasku = {
             cluster: "genMultistateInput",
             attribute: "presentValue",
             description: "Cover switch button press action",
+            entityCategory: "diagnostic"
         }),
     coverSwitchType: (name, endpointName) =>
         enumLookup({
@@ -226,7 +228,7 @@ const romasku = {
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "switchType",
             description: "Type of cover switch: toggle (rocker), momentary (push button), or momentary_nc (normally closed)",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverMoving: (name, endpointName) =>
         enumLookup({
@@ -241,6 +243,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: "moving",
             description: "Cover movement status",
+            entityCategory: "diagnostic"
         }),
     coverMotorReversal: (name, endpointName) =>
         binary({
@@ -251,7 +254,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: "motorReversal",
             description: "Reverse motor direction (swap OPEN/CLOSE relays)",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverCalibrationTime: (name, endpointName) =>
         numeric({
@@ -265,7 +268,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: "calibrationTime",
             description: "Total travel time between end positions (0.1s precision)",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverClosedSlack: (name, endpointName) =>
         numeric({
@@ -279,7 +282,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: "closedSlack",
             description: "Mechanical slack at closed position (0%) in seconds (0.1s precision)",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverOpenSlack: (name, endpointName) =>
         numeric({
@@ -293,7 +296,7 @@ const romasku = {
             cluster: "closuresWindowCovering",
             attribute: "openSlack",
             description: "Mechanical slack at open position (100%) in seconds (0.1s precision)",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverSwitchCoverIndex: (name, endpointName, output_cnt) =>
         enumLookup({
@@ -306,7 +309,7 @@ const romasku = {
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "coverIndex",
             description: "Which cover to control locally (detached = no local control)",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverSwitchInvert: (name, endpointName) =>
         binary({
@@ -318,7 +321,7 @@ const romasku = {
             attribute: "reversal",
             description: "Inverts UP/DOWN direction for inputs",
             access: "ALL",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverSwitchLocalMode: (name, endpointName) =>
         enumLookup({
@@ -328,7 +331,7 @@ const romasku = {
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "localMode",
             description: "When to trigger local cover",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverSwitchBindedMode: (name, endpointName) =>
         enumLookup({
@@ -338,7 +341,7 @@ const romasku = {
             cluster: "manuSpecificTuyaCoverSwitchConfig",
             attribute: "bindedMode",
             description: "When to send commands to bound devices",
-            entity_category: "config",
+            entityCategory: "config",
         }),
     coverSwitchLongPressDuration: (name, endpointName) =>
         numeric({
@@ -349,7 +352,7 @@ const romasku = {
             description: "Long press duration in milliseconds",
             valueMin: 0,
             valueMax: 5000,
-            entity_category: "config",
+            entityCategory: "config",
         }),
 };
 
