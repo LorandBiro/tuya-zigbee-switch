@@ -253,17 +253,6 @@ const romasku = {
             description: "Reverse motor direction (swap OPEN/CLOSE relays)",
             entity_category: "config",
         }),
-    coverCalibration: (name, endpointName) =>
-        binary({
-            name,
-            endpointName,
-            valueOn: [true, 1],
-            valueOff: [false, 0],
-            cluster: "closuresWindowCovering",
-            attribute: "calibration",
-            description: "Start calibration mode",
-            entity_category: "config",
-        }),
     coverCalibrationTime: (name, endpointName) =>
         numeric({
             name,
@@ -398,7 +387,6 @@ const definitions = [
                 attributes: {
                     moving: {ID: 0xff06, type: Zcl.DataType.ENUM8},
                     motorReversal: {ID: 0xff07, type: Zcl.DataType.BOOLEAN},
-                    calibration: {ID: 0xff08, type: Zcl.DataType.BOOLEAN},
                     calibrationTime: {ID: 0xff09, type: Zcl.DataType.UINT16},
                     closedSlack: {ID: 0xff0a, type: Zcl.DataType.UINT16},
                     openSlack: {ID: 0xff0b, type: Zcl.DataType.UINT16},
@@ -441,7 +429,6 @@ const definitions = [
                 endpointNames: ["{{outputName}}"]
             }),
             romasku.coverMoving("moving", "{{outputName}}"),
-            romasku.coverCalibration("calibration", "{{outputName}}"),
             romasku.coverCalibrationTime("calibration_time", "{{outputName}}"),
             romasku.coverClosedSlack("closed_slack", "{{outputName}}"),
             romasku.coverOpenSlack("open_slack", "{{outputName}}"),
