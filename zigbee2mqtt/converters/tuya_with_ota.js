@@ -59,6 +59,7 @@ const tuyaModels = [
     "TS0042",
     "TS0043",
     "TS0044",
+    "TS0046",
     "TS004F",
     "TS011F_plug_1",
     "TS011F_plug_2",
@@ -136,6 +137,7 @@ for (let definition of girierDefinitions) {
 }
 
 const lonsonhoModels = [
+    "QS-Zigbee-C03",
     "TS0001",
     "TS130F_dual",
 ];
