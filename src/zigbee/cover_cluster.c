@@ -51,14 +51,14 @@ static uint8_t window_covering_type = 0;
  * configured, the open_time is used for both directions. This allows a single open_time value to
  * cover both directions for symmetric covers.
  */
-static uint16_t cover_travel_time(zigbee_cover_cluster *cluster, uint8_t direction) {
+static uint32_t cover_travel_time(zigbee_cover_cluster *cluster, uint8_t direction) {
     uint16_t travel_time = cluster->open_time;
 
     if (direction == ZCL_ATTR_WINDOW_COVERING_MOVING_CLOSING && cluster->close_time > 0) {
         travel_time = cluster->close_time;
     }
 
-    return travel_time * 100; // Convert from tenth of seconds to milliseconds
+    return (uint32_t)travel_time * 100; // Convert from tenth of seconds to milliseconds
 }
 
 /**
